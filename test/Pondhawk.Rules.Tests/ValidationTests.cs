@@ -84,12 +84,12 @@ public class ValidationTests
         var ruleSet = new RuleSet();
 
         ruleSet.AddValidation<Person>("person-check")
-            .Assert<string>(p => p.Name)
+            .Assert(p => p.Name)
             .Is((p, v) => !string.IsNullOrWhiteSpace(v))
             .Otherwise("Name is required");
 
         ruleSet.AddValidation<Person>("age-check")
-            .Assert<int>(p => p.Age)
+            .Assert(p => p.Age)
             .Is((p, v) => v >= 0)
             .Otherwise("Age must be non-negative");
 
