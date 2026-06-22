@@ -36,6 +36,25 @@ await app.RunAsync();
 builder.Services.AddSingletonWithStart<RuleSetFactory>(f => f.Start());
 ```
 
+### File-Based Lifecycle Signaling
+
+`AppLifecycleService` is an `IHostedService` that signals lifecycle state through flag
+files and watches for an external shutdown request — handy when an orchestrator or script
+needs to observe or stop the app out of band.
+
+```csharp
+// Defaults the flag directory to AppContext.BaseDirectory
+builder.Services.AddHostedService(sp => new AppLifecycleService(
+    sp.GetRequiredService<IHostApplicationLifetime>(),
+    sp.GetRequiredService<ILoggerFactory>(),
+    flagDirectory: "/var/run/myapp"));
+```
+
+- On start it clears stale flags, then writes `started.flag` when the host has started and
+  `stopped.flag` when it has stopped.
+- A `FileSystemWatcher` watches the directory for an externally-created `muststop.flag`;
+  when one appears it requests a graceful shutdown via `IHostApplicationLifetime.StopApplication()`.
+
 ## How It Works
 
 - `AddSingletonWithStart<T>` registers your service as a singleton and stores the start/stop lambdas.

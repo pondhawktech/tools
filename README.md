@@ -443,6 +443,8 @@ services.AddSingletonWithStart<CacheService>(
     (svc, ct) => svc.FlushAsync(ct));
 ```
 
+Also includes `AppLifecycleService`, an `IHostedService` that signals lifecycle state through flag files (`started.flag` / `stopped.flag`) and watches for an external `muststop.flag` to trigger a graceful shutdown.
+
 ---
 
 ## Dependency Graph
