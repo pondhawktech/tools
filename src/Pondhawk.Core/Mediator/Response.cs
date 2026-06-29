@@ -40,6 +40,27 @@ public readonly record struct Response<T>
     public ErrorInfo? Error { get; }
 
     /// <summary>
+    /// Gets a value indicating whether the request failed. The convenience inverse of <see cref="Ok"/>.
+    /// </summary>
+    public bool IsError => !Ok;
+
+    /// <summary>
+    /// Gets the response value on success, or throws on failure. The framework's name for the
+    /// success-value accessor; an alias of <see cref="GetValueOrThrow"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when <see cref="Ok"/> is <see langword="false"/>.</exception>
+    public T AsEntity => GetValueOrThrow();
+
+    /// <summary>
+    /// Gets the failure to propagate, or throws on success. Combined with the implicit
+    /// <see cref="ErrorInfo"/> conversion, this lets a failed <see cref="Response{T}"/> be re-raised
+    /// into a differently-typed <see cref="Response{T}"/> via <c>return source.AsError;</c>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when <see cref="Ok"/> is <see langword="true"/>.</exception>
+    public ErrorInfo AsError =>
+        Error ?? throw new InvalidOperationException("Response is not an error.");
+
+    /// <summary>
     /// Creates a successful response carrying the given value.
     /// </summary>
     /// <param name="value">The handler's response value.</param>
@@ -66,6 +87,16 @@ public readonly record struct Response<T>
     /// </summary>
     /// <param name="value">The value to wrap.</param>
     public static implicit operator Response<T>(T value) => Success(value);
+
+    /// <summary>
+    /// Implicitly wraps an <see cref="ErrorInfo"/> in a failed envelope. This enables cross-type
+    /// error propagation: a failure read off a <see cref="Response{T}"/> of one payload type (via
+    /// <see cref="AsError"/>) converts to a failed <see cref="Response{T}"/> of any other payload
+    /// type, carrying the same error. Unambiguous against the value conversion because payload
+    /// types <typeparamref name="T"/> are never <see cref="ErrorInfo"/>.
+    /// </summary>
+    /// <param name="error">The error to wrap.</param>
+    public static implicit operator Response<T>(ErrorInfo error) => Failure(error);
 
     /// <summary>
     /// Projects the envelope to a single value, invoking <paramref name="onSuccess"/> when
