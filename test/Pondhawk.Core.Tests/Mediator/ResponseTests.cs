@@ -140,4 +140,61 @@ public class ResponseTests
         propagated.Error.ShouldBeSameAs(error);
     }
 
+    [Fact]
+    public void Default_IsAFailureNotASuccess()
+    {
+        // A Response<T> is a value type; default (uninitialized field, array slot, dictionary miss)
+        // must read as a coherent failure, never as a success carrying a null value.
+        Response<string> uninitialized = default;
+
+        uninitialized.Ok.ShouldBeFalse();
+        uninitialized.IsError.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Default_ErrorIsNonNullSystemFailure()
+    {
+        // The invariant "Error non-null iff not Ok" must hold on read even for default.
+        Response<string> uninitialized = default;
+
+        uninitialized.Error.ShouldNotBeNull();
+        uninitialized.Error!.Kind.ShouldBe(ErrorKind.System);
+    }
+
+    [Fact]
+    public void Default_Match_RoutesToFailureWithoutNullReference()
+    {
+        Response<int> uninitialized = default;
+
+        // onFailure must receive a non-null ErrorInfo — no NRE from a null Error.
+        var result = uninitialized.Match(v => $"ok:{v}", e => $"err:{e.Kind}");
+
+        result.ShouldBe("err:System");
+    }
+
+    [Fact]
+    public void Default_AsError_ReturnsSystemFailure()
+    {
+        Response<int> uninitialized = default;
+
+        // AsError must not throw "not an error" while IsError is true.
+        uninitialized.AsError.Kind.ShouldBe(ErrorKind.System);
+    }
+
+    [Fact]
+    public void Default_GetValueOrThrow_Throws()
+    {
+        Response<int> uninitialized = default;
+
+        Should.Throw<InvalidOperationException>(() => uninitialized.GetValueOrThrow());
+    }
+
+    [Fact]
+    public void Default_AsEntity_Throws()
+    {
+        Response<int> uninitialized = default;
+
+        Should.Throw<InvalidOperationException>(() => uninitialized.AsEntity);
+    }
+
 }
