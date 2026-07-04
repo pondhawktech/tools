@@ -42,20 +42,13 @@ namespace Pondhawk.Watch;
 /// Thread-safety: All operations are thread-safe. Polling runs on a background task.
 /// </para>
 /// </remarks>
-public class WatchSwitchSource : SwitchSource
-#if NET5_0_OR_GREATER
-    , IAsyncDisposable
-#endif
+public class WatchSwitchSource : SwitchSource, IAsyncDisposable
 {
     private readonly HttpClient _client;
     private readonly string _domain;
     private readonly TimeSpan _pollInterval;
     private readonly CancellationTokenSource _cts = new();
-#if NET9_0_OR_GREATER
     private readonly Lock _startLock = new();
-#else
-    private readonly object _startLock = new();
-#endif
     private readonly ManualResetEventSlim _ready = new(false);
     private Task? _pollTask;
     private bool _started;
@@ -180,7 +173,6 @@ public class WatchSwitchSource : SwitchSource
         }
     }
 
-#if NET5_0_OR_GREATER
     /// <summary>
     /// Disposes the switch source.
     /// </summary>
@@ -205,5 +197,4 @@ public class WatchSwitchSource : SwitchSource
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-#endif
 }

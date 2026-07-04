@@ -12,8 +12,6 @@ namespace Pondhawk.Watch;
 /// </summary>
 public static class SerilogExtensions
 {
-
-#if NET7_0_OR_GREATER
     /// <summary>
     /// Creates a disposable method tracing scope that logs entry at Verbose level
     /// and logs exit with elapsed time on dispose. The returned <see cref="MethodLogger"/>
@@ -37,8 +35,6 @@ public static class SerilogExtensions
 
         return new MethodLogger(logger, method, tracing);
     }
-
-#endif
 
     /// <summary>
     /// Serializes an object to JSON and logs it as a structured payload with the type name as the message.

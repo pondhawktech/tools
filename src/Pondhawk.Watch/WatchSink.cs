@@ -25,10 +25,7 @@ namespace Pondhawk.Watch;
 /// and sends converted Watch LogEvents to the Watch Server.
 /// </para>
 /// </remarks>
-public sealed class WatchSink : ILogEventSink, IDisposable
-#if NET5_0_OR_GREATER
-    , IAsyncDisposable
-#endif
+public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
 {
     private readonly HttpClient _client;
     private readonly SwitchSource _switchSource;
@@ -44,11 +41,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable
     // Circuit breaker state
     private int _consecutiveFailures;
     private DateTime _circuitOpenUntil = DateTime.MinValue;
-#if NET9_0_OR_GREATER
     private readonly Lock _circuitLock = new();
-#else
-    private readonly object _circuitLock = new();
-#endif
 
     // Critical event buffer
     private readonly ConcurrentQueue<LogEvent> _criticalBuffer = new();
@@ -464,7 +457,6 @@ public sealed class WatchSink : ILogEventSink, IDisposable
         _switchSource.Stop();
     }
 
-#if NET6_0_OR_GREATER
     /// <summary>
     /// Asynchronously completes the channel, waits for pending batches to flush, and stops the switch source.
     /// </summary>
@@ -487,5 +479,4 @@ public sealed class WatchSink : ILogEventSink, IDisposable
 
         _switchSource.Stop();
     }
-#endif
 }
