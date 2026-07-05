@@ -26,7 +26,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using MemoryPack;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Represents a single log event with all associated metadata and payload.

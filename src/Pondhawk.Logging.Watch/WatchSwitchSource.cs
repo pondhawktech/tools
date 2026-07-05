@@ -28,7 +28,7 @@ using System.Threading;
 using CommunityToolkit.Diagnostics;
 using Serilog.Events;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// A SwitchSource that fetches switch configuration from a Watch Server.

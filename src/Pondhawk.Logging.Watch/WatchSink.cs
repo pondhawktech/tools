@@ -4,11 +4,12 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Channels;
 using CommunityToolkit.Diagnostics;
+using Pondhawk.Logging;
 using Serilog.Core;
 using Serilog.Events;
 using SerilogEvent = Serilog.Events.LogEvent;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Serilog ILogEventSink with Channel-based batching, HTTP posting, and circuit breaker
@@ -145,7 +146,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
         // Capture correlation ID on the caller's thread where Activity.Current is available.
         // The flush loop runs on a background thread that has no access to the caller's Activity.
         var correlationId = GetCorrelationId();
-        logEvent.AddPropertyIfAbsent(new LogEventProperty(WatchPropertyNames.CorrelationId, new ScalarValue(correlationId)));
+        logEvent.AddPropertyIfAbsent(new LogEventProperty(LogPropertyNames.CorrelationId, new ScalarValue(correlationId)));
 
         _channel.Writer.TryWrite(logEvent);
     }
@@ -351,15 +352,15 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
         };
 
         // Extract Watch-specific properties
-        if (serilogEvent.Properties.TryGetValue(WatchPropertyNames.Nesting, out var nestingValue) &&
+        if (serilogEvent.Properties.TryGetValue(LogPropertyNames.Nesting, out var nestingValue) &&
             nestingValue is ScalarValue { Value: int nesting })
         {
             le.Nesting = nesting;
         }
 
-        if (serilogEvent.Properties.TryGetValue(WatchPropertyNames.PayloadType, out var typeValue) &&
+        if (serilogEvent.Properties.TryGetValue(LogPropertyNames.PayloadType, out var typeValue) &&
             typeValue is ScalarValue { Value: int payloadType } &&
-            serilogEvent.Properties.TryGetValue(WatchPropertyNames.PayloadContent, out var contentValue) &&
+            serilogEvent.Properties.TryGetValue(LogPropertyNames.PayloadContent, out var contentValue) &&
             contentValue is ScalarValue { Value: string payloadContent })
         {
             le.Type = payloadType;
@@ -402,7 +403,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
 
     private static string GetCorrelationIdFromEvent(SerilogEvent logEvent)
     {
-        if (logEvent.Properties.TryGetValue(WatchPropertyNames.CorrelationId, out var value) &&
+        if (logEvent.Properties.TryGetValue(LogPropertyNames.CorrelationId, out var value) &&
             value is ScalarValue { Value: string correlationId })
         {
             return correlationId;
@@ -416,12 +417,12 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
         var activity = Activity.Current;
         if (activity != null)
         {
-            var correlation = activity.GetBaggageItem(WatchPropertyNames.CorrelationBaggageKey);
+            var correlation = activity.GetBaggageItem(LogPropertyNames.CorrelationBaggageKey);
             if (!string.IsNullOrEmpty(correlation))
                 return correlation!;
 
             var newId = Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
-            activity.SetBaggage(WatchPropertyNames.CorrelationBaggageKey, newId);
+            activity.SetBaggage(LogPropertyNames.CorrelationBaggageKey, newId);
             return newId;
         }
 
@@ -432,7 +433,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
     {
         var properties = logEvent.Properties
             .Where(p => !string.Equals(p.Key, "SourceContext", StringComparison.Ordinal) &&
-                        !p.Key.StartsWith("Watch.", StringComparison.Ordinal))
+                        !p.Key.StartsWith(LogPropertyNames.Prefix, StringComparison.Ordinal))
             .ToList();
 
         if (properties.Count == 0)

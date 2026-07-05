@@ -22,15 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
-/// Source-generated JSON serialization context for LogEvent and LogEventBatch.
+/// Response from the switches API endpoint.
 /// </summary>
-[JsonSourceGenerationOptions(JsonSerializerDefaults.General)]
-[JsonSerializable(typeof(LogEvent))]
-[JsonSerializable(typeof(LogEventBatch))]
-public partial class LogEventBatchContext : JsonSerializerContext;
+public class SwitchesResponse
+{
+    /// <summary>
+    /// Gets or sets the list of switch definitions.
+    /// </summary>
+    public IList<SwitchDto> Switches { get; set; } = [];
+}

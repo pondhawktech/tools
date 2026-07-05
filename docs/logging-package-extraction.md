@@ -1,6 +1,8 @@
 # Build Brief: Extract `Pondhawk.Logging`, rename Watch to `Pondhawk.Logging.Watch`
 
-Status: **in progress** — Phase 1 **done** (Pondhawk.Logging builds 0/0). Branch: `refactor/extract-pondhawk-logging`.
+Status: **in progress** — Phases 1–2 **done** (both src projects build 0/0). Branch: `refactor/extract-pondhawk-logging`.
+
+Phase 2 notes: only `WatchSink.cs` needed repointing (`LogPropertyNames` + `PayloadType` via `using Pondhawk.Logging;`, and the `StartsWith("Watch.")` filter → `LogPropertyNames.Prefix`); `LogEvent.cs`'s only "PayloadType" mention was a comment. Solution `.slnx` and test projects still reference the old `Pondhawk.Watch` path — fixed in Phases 4–5.
 
 > Note: `ILoggerSource`'s method is named **`CreateLogger<T>()` / `CreateLogger(Type)` / `CreateLogger(string)`**, not `For<T>()` — `For` trips analyzer rule CA1716 (collides with the VB `For` keyword). Usage: `loggers.CreateLogger<GetOrderHandler>()`.
 

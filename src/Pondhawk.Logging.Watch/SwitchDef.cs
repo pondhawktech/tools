@@ -26,7 +26,7 @@ SOFTWARE.
 using System.Drawing;
 using Serilog.Events;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Defines the configuration for a logging switch.

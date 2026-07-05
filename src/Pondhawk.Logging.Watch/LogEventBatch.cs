@@ -25,7 +25,7 @@ SOFTWARE.
 using System.Diagnostics.CodeAnalysis;
 using MemoryPack;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Represents a batch of log events for transmission to a sink.

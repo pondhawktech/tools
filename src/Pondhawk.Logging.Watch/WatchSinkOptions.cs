@@ -1,7 +1,7 @@
 using System.Drawing;
 using Serilog.Events;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Configuration options for the <see cref="WatchSinkExtensions.Watch(Serilog.Configuration.LoggerSinkConfiguration, string, string)"/> convenience methods.

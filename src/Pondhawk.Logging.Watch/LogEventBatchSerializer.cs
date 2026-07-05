@@ -27,7 +27,7 @@ using MemoryPack;
 using MemoryPack.Compression;
 using Microsoft.IO;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Provides serialization for LogEventBatch using MemoryPack+Brotli (binary wire format) and JSON.

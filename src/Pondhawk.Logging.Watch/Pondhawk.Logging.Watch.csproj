@@ -5,8 +5,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Title>Pondhawk Watch</Title>
-    <Description>Serilog sink for structured logging with rich UI visualization via Watch Server</Description>
+    <Title>Pondhawk Logging — Watch provider</Title>
+    <Description>Watch provider for Pondhawk.Logging: a Serilog sink with Channel-based batching, dynamic switch-based level control, and a switch-aware ILoggerSource for rich structured logging via the Watch Server.</Description>
     <Authors>Pond Hawk Technologies Inc.</Authors>
     <Company>Pond Hawk Technologies Inc.</Company>
     <Copyright>Pond Hawk Technologies Inc. (c) 2026</Copyright>
@@ -18,7 +18,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Pondhawk.Watch.Tests" />
+    <InternalsVisibleTo Include="Pondhawk.Logging.Watch.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pondhawk.Logging\Pondhawk.Logging.csproj" />
   </ItemGroup>
 
   <ItemGroup>

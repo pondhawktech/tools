@@ -1,7 +1,8 @@
 ﻿/*
 The MIT License (MIT)
 
-Copyright (c) 2024 Pond Hawk Technologies Inc.
+Copyright (c) 2017 The Kampilan Group Inc.
+Copyright (c) 2025 Pond Hawk Technologies Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,34 +23,47 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-namespace Pondhawk.Watch;
+using System.Drawing;
+using Serilog.Events;
+
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
-/// Data transfer object for switch configuration from Watch Server.
+/// Default implementation of ISwitch with fluent configuration API.
 /// </summary>
 /// <remarks>
-/// Matches the JSON format returned by GET /api/switches?domain={domain}.
-/// Uses PascalCase property names to match Watch Server's JSON serialization.
+/// Switch instances are immutable after construction via the fluent API.
+/// They are safe to cache and share across threads.
 /// </remarks>
-public class SwitchDto
+public class Switch
 {
     /// <summary>
-    /// Gets or sets the pattern to match against category names.
+    /// Creates a new Switch instance with default values.
     /// </summary>
-    public string Pattern { get; set; } = string.Empty;
+    /// <returns>A new Switch for fluent configuration.</returns>
+    public static Switch Create()
+    {
+        return new Switch();
+    }
 
     /// <summary>
-    /// Gets or sets the optional tag.
+    /// Gets the pattern to match against logger categories.
     /// </summary>
-    public string Tag { get; set; } = string.Empty;
+    public string Pattern { get; init; } = "";
 
     /// <summary>
-    /// Gets or sets the minimum log level.
+    /// Gets an optional tag for categorization.
     /// </summary>
-    public int Level { get; set; }
+    public string Tag { get; init; } = "";
 
     /// <summary>
-    /// Gets or sets the ARGB color value.
+    /// Gets the minimum log level.
     /// </summary>
-    public int Color { get; set; }
+    public LogEventLevel Level { get; init; } = LogEventLevel.Error;
+
+    /// <summary>
+    /// Gets the color for log events.
+    /// </summary>
+    public Color Color { get; init; } = Color.White;
+
 }

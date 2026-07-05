@@ -3,7 +3,7 @@ using Serilog;
 using Serilog.Configuration;
 using Serilog.Events;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging.Watch;
 
 /// <summary>
 /// Serilog configuration extensions for the Watch sink.
