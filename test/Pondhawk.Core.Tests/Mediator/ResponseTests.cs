@@ -197,4 +197,26 @@ public class ResponseTests
         Should.Throw<InvalidOperationException>(() => uninitialized.AsEntity);
     }
 
+    [Fact]
+    public void Failure_NullError_Throws()
+    {
+        Should.Throw<ArgumentNullException>(() => Response<int>.Failure(null!));
+    }
+
+    [Fact]
+    public void Match_NullOnSuccess_Throws()
+    {
+        Response<string> ok = "x";
+
+        Should.Throw<ArgumentNullException>(() => ok.Match(null!, e => e.Explanation));
+    }
+
+    [Fact]
+    public void Match_NullOnFailure_Throws()
+    {
+        Response<string> ok = "x";
+
+        Should.Throw<ArgumentNullException>(() => ok.Match(v => v, null!));
+    }
+
 }

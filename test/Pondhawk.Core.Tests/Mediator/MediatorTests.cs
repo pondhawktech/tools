@@ -42,6 +42,17 @@ public class MediatorTests
         }
     }
 
+    // A mutation with no entity to return uses Response<Receipt>.
+    public record DeleteThing(int Id) : ICommand<Receipt>;
+
+    public class DeleteThingHandler : ICommandHandler<DeleteThing, Receipt>
+    {
+        public Task<Receipt> HandleAsync(DeleteThing request, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(Receipt.One);
+        }
+    }
+
     public record NoHandlerRequest : IRequest<string>;
 
     public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
@@ -71,6 +82,17 @@ public class MediatorTests
         {
             return default;
         }
+    }
+
+    // Throws before delegating, so the failure originates in a behavior rather than the handler.
+    public class ThrowingBehavior<TRequest, TResponse>(Exception toThrow) : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        public Task<TResponse> HandleAsync(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken = default)
+            => throw toThrow;
     }
 
     // ── Throwing handlers (for the enveloping seam) ──
@@ -111,6 +133,28 @@ public class MediatorTests
     {
         public Task<string> HandleAsync(CancelThing request, CancellationToken cancellationToken = default)
             => throw new OperationCanceledException();
+    }
+
+    public record ConflictThing : IRequest<string>;
+
+    public class ConflictThingHandler : IRequestHandler<ConflictThing, string>
+    {
+        public Task<string> HandleAsync(ConflictThing request, CancellationToken cancellationToken = default)
+            => throw new ConflictException("Duplicate thing");
+    }
+
+    // An ExternalException whose Kind falls in neither the Information nor Warning arm of LogByKind.
+    private sealed class RemoteFailureException : ExternalException
+    {
+        public RemoteFailureException() : base("Upstream unavailable") => Kind = ErrorKind.Remote;
+    }
+
+    public record RemoteThing : IRequest<string>;
+
+    public class RemoteThingHandler : IRequestHandler<RemoteThing, string>
+    {
+        public Task<string> HandleAsync(RemoteThing request, CancellationToken cancellationToken = default)
+            => throw new RemoteFailureException();
     }
 
     // ── Helpers ──
@@ -328,6 +372,93 @@ public class MediatorTests
         await mediator.SendAsync(new FindThing(1));
 
         logger.Entries.ShouldNotContain(e => e.Level == LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task SendAsync_WarningKindException_LogsAtWarning()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IRequestHandler<ConflictThing, string>, ConflictThingHandler>();
+        var provider = services.BuildServiceProvider();
+
+        var logger = new ListLogger<Pondhawk.Mediator.Mediator>();
+        var mediator = new Pondhawk.Mediator.Mediator(provider, logger);
+
+        var result = await mediator.SendAsync(new ConflictThing());
+
+        result.Ok.ShouldBeFalse();
+        result.Error!.Kind.ShouldBe(ErrorKind.Conflict);
+        logger.Entries.ShouldContain(e => e.Level == LogLevel.Warning);
+        logger.Entries.ShouldNotContain(e => e.Level == LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task SendAsync_OtherKindExternalException_LogsAtError()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IRequestHandler<RemoteThing, string>, RemoteThingHandler>();
+        var provider = services.BuildServiceProvider();
+
+        var logger = new ListLogger<Pondhawk.Mediator.Mediator>();
+        var mediator = new Pondhawk.Mediator.Mediator(provider, logger);
+
+        var result = await mediator.SendAsync(new RemoteThing());
+
+        result.Ok.ShouldBeFalse();
+        result.Error!.Kind.ShouldBe(ErrorKind.Remote);
+        logger.Entries.ShouldContain(e => e.Level == LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task SendAsync_BehaviorThrowsExternalException_EnvelopesWithKind()
+    {
+        // The seam wraps the whole pipeline, so a failure raised in a behavior (not the handler)
+        // must envelope with its kind preserved just like a handler failure.
+        var services = new ServiceCollection();
+        services.AddScoped<IRequestHandler<Ping, string>, PingHandler>();
+        services.AddSingleton<IPipelineBehavior<Ping, string>>(
+            new ThrowingBehavior<Ping, string>(new ConflictException("dup from behavior")));
+        services.AddScoped<IMediator, Pondhawk.Mediator.Mediator>();
+        var provider = services.BuildServiceProvider();
+        var mediator = provider.GetRequiredService<IMediator>();
+
+        var result = await mediator.SendAsync(new Ping("x"));
+
+        result.Ok.ShouldBeFalse();
+        result.Error!.Kind.ShouldBe(ErrorKind.Conflict);
+        result.Error.Explanation.ShouldBe("dup from behavior");
+    }
+
+    [Fact]
+    public async Task SendAsync_BehaviorThrowsUnexpected_EnvelopesAsSystem()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IRequestHandler<Ping, string>, PingHandler>();
+        services.AddSingleton<IPipelineBehavior<Ping, string>>(
+            new ThrowingBehavior<Ping, string>(new InvalidOperationException("behavior boom")));
+        services.AddScoped<IMediator, Pondhawk.Mediator.Mediator>();
+        var provider = services.BuildServiceProvider();
+        var mediator = provider.GetRequiredService<IMediator>();
+
+        var result = await mediator.SendAsync(new Ping("x"));
+
+        result.Ok.ShouldBeFalse();
+        result.Error!.Kind.ShouldBe(ErrorKind.System);
+        result.Error.Explanation.ShouldBe("behavior boom");
+    }
+
+    [Fact]
+    public async Task SendAsync_ReceiptCommand_RoundTripsThroughEnvelope()
+    {
+        // The documented delete/bulk mutation shape: a command whose payload is a Receipt.
+        var mediator = BuildMediator(s =>
+            s.AddScoped<IRequestHandler<DeleteThing, Receipt>, DeleteThingHandler>());
+
+        var result = await mediator.SendAsync(new DeleteThing(7));
+
+        result.Ok.ShouldBeTrue();
+        result.Value.ShouldNotBeNull();
+        result.Value!.Affected.ShouldBe(1);
     }
 
     [Fact]
