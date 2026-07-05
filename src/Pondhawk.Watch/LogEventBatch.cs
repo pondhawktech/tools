@@ -23,9 +23,7 @@ SOFTWARE.
 */
 
 using System.Diagnostics.CodeAnalysis;
-#if NET7_0_OR_GREATER
 using MemoryPack;
-#endif
 
 namespace Pondhawk.Watch;
 
@@ -42,12 +40,8 @@ namespace Pondhawk.Watch;
 /// domain for multi-tenant Watch server deployments.
 /// </para>
 /// </remarks>
-#if NET7_0_OR_GREATER
 [MemoryPackable]
 public partial class LogEventBatch
-#else
-public class LogEventBatch
-#endif
 {
     /// <summary>
     /// An empty batch singleton for null-object pattern usage.

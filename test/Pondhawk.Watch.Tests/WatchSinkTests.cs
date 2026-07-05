@@ -321,4 +321,146 @@ public class WatchSinkTests
 
         sink.Dispose();
     }
+
+    // --- ConvertEvent: exception detail reaches the wire ---
+
+    [Fact]
+    public async Task ConvertEvent_WithException_TransmitsTypeMessageAndStackTrace()
+    {
+        var handler = new MockHttpHandler();
+        LogEventBatch received = null;
+        handler.SetHandler(async (req, ct) =>
+        {
+            var bytes = await req.Content.ReadAsByteArrayAsync(ct);
+            using var ms = new MemoryStream(bytes);
+            received = await LogEventBatchSerializer.FromStream(ms);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var sink = new WatchSink(CreateClient(handler), CreateSwitchSource(), "test");
+
+        Exception thrown;
+        try { throw new InvalidOperationException("boom-detail"); }
+        catch (Exception e) { thrown = e; }
+
+        await sink.FlushBatchAsync(MakeEventList(level: LogEventLevel.Error, exception: thrown));
+
+        received.ShouldNotBeNull();
+        var ev = received.Events[0];
+        ev.ErrorType.ShouldBe("System.InvalidOperationException");
+        ev.Type.ShouldBe((int)PayloadType.Text);
+        ev.Payload.ShouldContain("boom-detail");
+        // The stack trace of the thrown exception names this method — proof it reached the wire.
+        ev.Payload.ShouldContain(nameof(ConvertEvent_WithException_TransmitsTypeMessageAndStackTrace));
+    }
+
+    // --- FlushBatch: a poison event is skipped, not fatal ---
+
+    [Fact]
+    public async Task FlushBatch_PoisonEvent_SkippedButGoodEventsStillSent()
+    {
+        var handler = new MockHttpHandler();
+        LogEventBatch received = null;
+        handler.SetHandler(async (req, ct) =>
+        {
+            var bytes = await req.Content.ReadAsByteArrayAsync(ct);
+            using var ms = new MemoryStream(bytes);
+            received = await LogEventBatchSerializer.FromStream(ms);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var source = new PoisonSwitchSource();
+        source.WhenNotMatched(LogEventLevel.Verbose);
+        var sink = new WatchSink(CreateClient(handler), source, "test");
+
+        var events = new List<SerilogEvent>
+        {
+            MakeSerilogEvent(sourceContext: "poison"),   // ConvertEvent throws for this one
+            MakeSerilogEvent(sourceContext: "GoodApp"),
+        };
+        await sink.FlushBatchAsync(events);
+
+        handler.Requests.Count.ShouldBe(1);
+        received.ShouldNotBeNull();
+        received.Events.Count.ShouldBe(1);
+        received.Events[0].Category.ShouldBe("GoodApp");
+    }
+
+    // --- Dispose ownership ---
+
+    [Fact]
+    public void Dispose_OwnsDependencies_DisposesSwitchSourceAndClient()
+    {
+        var handler = new TrackingHandler();
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:11000") };
+        var source = new TrackingSwitchSource();
+        source.WhenNotMatched(LogEventLevel.Verbose);
+        var sink = new WatchSink(client, source, "test", ownsDependencies: true);
+
+        sink.Dispose();
+
+        source.DisposeCalled.ShouldBeTrue();
+        source.StopCalled.ShouldBeFalse();
+        handler.DisposeCalled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Dispose_DoesNotOwnDependencies_OnlyStopsSwitchSource()
+    {
+        var handler = new TrackingHandler();
+        var client = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:11000") };
+        var source = new TrackingSwitchSource();
+        source.WhenNotMatched(LogEventLevel.Verbose);
+        var sink = new WatchSink(client, source, "test");
+
+        sink.Dispose();
+
+        source.StopCalled.ShouldBeTrue();
+        source.DisposeCalled.ShouldBeFalse();
+        handler.DisposeCalled.ShouldBeFalse();
+    }
+
+    // --- Test doubles ---
+
+    private sealed class PoisonSwitchSource : SwitchSource
+    {
+        public override Switch Lookup(string category)
+        {
+            if (string.Equals(category, "poison", StringComparison.Ordinal))
+                throw new InvalidOperationException("poison lookup");
+            return base.Lookup(category);
+        }
+    }
+
+    private sealed class TrackingSwitchSource : SwitchSource
+    {
+        public bool StopCalled { get; private set; }
+        public bool DisposeCalled { get; private set; }
+
+        public override void Stop()
+        {
+            StopCalled = true;
+            base.Stop();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                DisposeCalled = true;
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class TrackingHandler : HttpMessageHandler
+    {
+        public bool DisposeCalled { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                DisposeCalled = true;
+            base.Dispose(disposing);
+        }
+    }
 }

@@ -55,8 +55,10 @@ internal sealed class LoggingJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
         if (typeInfo.Kind != JsonTypeInfoKind.Object)
             return typeInfo;
 
-        foreach (var prop in typeInfo.Properties)
+        for (var i = 0; i < typeInfo.Properties.Count; i++)
         {
+            var prop = typeInfo.Properties[i];
+
             var sensitive = prop.AttributeProvider switch
             {
                 MemberInfo mi => mi.GetCustomAttribute<SensitiveAttribute>(inherit: true),
@@ -64,15 +66,23 @@ internal sealed class LoggingJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
                 _ => null
             };
 
+            var originalGetter = prop.Get;
+
             if (sensitive is not null)
             {
-                var originalGetter = prop.Get;
-                prop.Get = o => SensitivePropertyGetter(o, originalGetter, prop.PropertyType);
+                // Replace the property with a string-typed one carrying the mask. The original
+                // getter's return value is only inspected for presence, so the declared type no
+                // longer matters — this avoids handing a string to, say, an int property's
+                // converter, which would throw during writing and collapse the entire payload.
+                var masked = typeInfo.CreateJsonPropertyInfo(typeof(string), prop.Name);
+                masked.Get = o => MaskSensitive(o, originalGetter);
+                typeInfo.Properties.RemoveAt(i);
+                typeInfo.Properties.Insert(i, masked);
             }
             else
             {
-                var originalGetter = prop.Get;
-                prop.Get = o => SafePropertyGetter(o, originalGetter, prop.PropertyType);
+                var propertyType = prop.PropertyType;
+                prop.Get = o => SafePropertyGetter(o, originalGetter, propertyType);
             }
         }
 
@@ -103,37 +113,26 @@ internal sealed class LoggingJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
     }
 
     /// <summary>
-    /// Gets a property value with sensitive data masking.
+    /// Produces the masked string for a sensitive property: "Sensitive - HasValue: true/false".
+    /// Always returns a string (the property is re-typed as string), so it serializes cleanly
+    /// regardless of the original property type. A throwing getter is reported as no value.
     /// </summary>
-    /// <remarks>
-    /// For string properties, returns "Sensitive - HasValue: true/false" instead of the actual value.
-    /// For other types, returns the default value.
-    /// </remarks>
-    private static object? SensitivePropertyGetter(object source, Func<object, object?>? getter, Type type)
+    private static string MaskSensitive(object source, Func<object, object?>? getter)
     {
-        object? GetDefault()
-        {
-            return type.IsValueType ? Activator.CreateInstance(type) : null;
-        }
-
         try
         {
-            if (getter is null)
-                return GetDefault();
-
-            var value = getter(source);
+            var value = getter is null ? null : getter(source);
 
             if (value is string s)
             {
                 return $"Sensitive - HasValue: {!string.IsNullOrWhiteSpace(s)}";
             }
 
-            // For non-string sensitive properties, indicate presence without value
             return $"Sensitive - HasValue: {value is not null}";
         }
         catch
         {
-            return GetDefault();
+            return "Sensitive - HasValue: false";
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿#if NET7_0_OR_GREATER
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Serilog;
 using Serilog.Core;
@@ -109,4 +108,3 @@ public sealed class MethodLogger : ILogger, IDisposable
     /// <inheritdoc />
     public bool BindProperty(string? propertyName, object? value, bool destructureObjects, [NotNullWhen(true)] out LogEventProperty? property) => _logger.BindProperty(propertyName, value, destructureObjects, out property);
 }
-#endif

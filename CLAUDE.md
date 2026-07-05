@@ -47,13 +47,13 @@ Core utilities, pipeline infrastructure, mediator, and common exception types. K
 - **Utilities**: Pipeline infrastructure (`IServiceCollection`-based DI registration), type extensions, date/time helpers.
 - **Exceptions**: Common exception types.
 
-### Pondhawk.Watch — Serilog Sink + Logging API (standalone, multi-targeted)
+### Pondhawk.Watch — Serilog Sink + Logging API (standalone)
 
-A Serilog `ILogEventSink` with Channel-based batching, plus the full Watch logging API. Fully standalone — no dependency on Pondhawk.Core. Multi-targeted: `net10.0` and `netstandard2.0`.
+A Serilog `ILogEventSink` with Channel-based batching, plus the full Watch logging API. Fully standalone — no dependency on Pondhawk.Core. Targets `net10.0` (single target — no conditional compilation).
 
 - **Logging API** (`Pondhawk.Watch` namespace): `SerilogExtensions` provides extensions on both `Serilog.ILogger` and `object`:
   - **`object.GetLogger()`** — returns a `Serilog.ILogger` with `SourceContext` set to the concise full name of the object's type
-  - **`object.EnterMethod()`** / **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time (.NET 7+ only)
+  - **`object.EnterMethod()`** / **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time
   - **`ILogger.Inspect(name, value)`** — logs a name/value pair as `"{Name} = {Value}"` at Debug level
   - **`ILogger.LogObject(value)`** — serializes an object to JSON payload
   - **`ILogger.LogJson/LogSql/LogXml/LogYaml/LogText(title, content)`** — typed payload logging with syntax highlighting hints
@@ -61,8 +61,7 @@ A Serilog `ILogEventSink` with Channel-based batching, plus the full Watch loggi
 - **WatchSink**: `ILogEventSink` implementation with unbounded Channel batching. Converts Serilog events to Watch `LogEvent` instances with switch-based filtering. Circuit breaker for HTTP resilience.
 - **WatchSinkExtensions**: Serilog configuration extensions. **`UseWatch(serverUrl, domain)`** is the primary API — sets `MinimumLevel.Verbose()` and adds the Watch sink so the Watch Server controls filtering via switches. `WriteTo.Watch()` is the lower-level alternative for manual minimum-level control.
 - **Switching**: Dynamic log level control via `SwitchSource`/`SwitchDef` with pattern matching. `WatchSwitchSource` polls a Watch Server for switch configuration.
-- **LogEvent/LogEventBatch**: Event model with dual serialization: MemoryPack+Brotli on .NET 7+ (`#if NET7_0_OR_GREATER`), System.Text.Json on netstandard2.0.
-- **netstandard2.0 note**: `MethodLogger` and `EnterMethod()` require .NET 7+ (Serilog ILogger default interface methods). All other logging APIs (GetLogger, LogObject, LogJson, etc.) work on all targets.
+- **LogEvent/LogEventBatch**: Event model serialized as MemoryPack+Brotli for the wire; System.Text.Json (source-generated via `LogEventBatchContext`) is available for debugging/testing.
 
 ### Pondhawk.Rules — Rule Engine (standalone, no Core dependency)
 
@@ -121,7 +120,7 @@ Lightweight service lifecycle management for `Microsoft.Extensions.Hosting`. Sta
 
 ```
 Pondhawk.Core     (foundation — mediator, pipeline infrastructure, utilities, exceptions)
-Pondhawk.Watch    (standalone — logging API, Serilog sink, multi-targeted net10.0+netstandard2.0)
+Pondhawk.Watch    (standalone — logging API, Serilog sink, net10.0)
 Pondhawk.Rules    (standalone)
 Pondhawk.Rules.EFCore ──→ Pondhawk.Rules
 Pondhawk.Rql      (standalone)

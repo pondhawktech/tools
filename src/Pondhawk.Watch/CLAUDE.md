@@ -4,7 +4,7 @@
 
 Pondhawk.Watch is a Serilog `ILogEventSink` with Channel-based batching, plus the full Watch logging API (`SerilogExtensions`). It provides structured logging with method tracing, object serialization, typed payloads, and HTTP sink delivery with circuit-breaker resilience.
 
-Multi-targeted: `net10.0` and `netstandard2.0`. Fully standalone — no dependency on Pondhawk.Core.
+Targets `net10.0` (single target — no conditional compilation). Fully standalone — no dependency on Pondhawk.Core.
 
 ---
 
@@ -14,7 +14,7 @@ Multi-targeted: `net10.0` and `netstandard2.0`. Fully standalone — no dependen
 
 ### 1. Start Methods with EnterMethod
 
-Most methods should begin with `EnterMethod()`. Only the simplest methods (one-liners, trivial getters) skip this. Requires .NET 7+ (uses Serilog ILogger default interface methods).
+Most methods should begin with `EnterMethod()`. Only the simplest methods (one-liners, trivial getters) skip this.
 
 ```csharp
 using Pondhawk.Watch;
@@ -171,7 +171,7 @@ catch (Exception ex)
 
 ## Extension Method Reference
 
-### Method Tracing (.NET 7+ only)
+### Method Tracing
 
 ```csharp
 using var scope = this.EnterMethod();     // object extension
@@ -249,12 +249,6 @@ The logging API (`SerilogExtensions`) writes well-known Serilog property names:
 
 `WatchSink.ConvertEvent()` reads these properties from the Serilog `LogEvent` and maps them to the Watch `LogEvent` model.
 
-### netstandard2.0 Limitations
-
-- `MethodLogger` and `EnterMethod()` are `#if NET7_0_OR_GREATER` only (Serilog `ILogger` requires default interface methods)
-- All other APIs (`GetLogger`, `LogObject`, `LogJson`, `Inspect`, `CorrelationManager`, `SensitiveAttribute`, etc.) work on all targets
-- `Stopwatch.GetElapsedTime()` polyfilled via `TimeSpan.FromSeconds()` calculation
-
 ## Performance Guidelines
 
 1. **Disabled Levels**: `WatchSwitchConfig.IsEnabled()` check is near-zero cost
@@ -276,10 +270,10 @@ logger.Debug($"User {userId} logged in");
 src/Pondhawk.Watch/
   PayloadType.cs                        # None, Json, Sql, Xml, Text, Yaml
   WatchPropertyNames.cs                 # Serilog property name constants
-  LogEvent.cs                           # Core event model (MemoryPackable on .NET 7+)
+  LogEvent.cs                           # Core event model (MemoryPackable)
   LogEventBatch.cs                      # Batch container
-  LogEventBatchSerializer.cs            # MemoryPack+Brotli / System.Text.Json
-  LogEventBatchContext.cs               # STJ source-gen context (netstandard2.0)
+  LogEventBatchSerializer.cs            # MemoryPack+Brotli wire; JSON for debug/testing
+  LogEventBatchContext.cs               # STJ source-gen context (JSON debug/testing)
 
   WatchSink.cs                          # ILogEventSink with channel batching + circuit breaker
   WatchSinkExtensions.cs                # Serilog LoggerConfiguration extension
@@ -292,11 +286,10 @@ src/Pondhawk.Watch/
   WatchSwitchSource.cs                  # Polls Watch Server for switch configuration
 
   GlobalUsings.cs                       # Shared usings for the project
-  Polyfills/IsExternalInit.cs           # init accessor polyfill for netstandard2.0
 
   Logging/
     SerilogExtensions.cs                # GetLogger, EnterMethod, LogObject, LogJson, etc.
-    MethodLogger.cs                     # ILogger wrapper with method tracing (.NET 7+ only)
+    MethodLogger.cs                     # ILogger wrapper with method tracing
     ILoggerSource.cs                    # Logger creation abstraction
     LoggerSource.cs                     # Default ILoggerSource implementation
     CorrelationManager.cs               # Activity-based correlation ID management
