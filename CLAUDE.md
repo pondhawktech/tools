@@ -51,9 +51,8 @@ Core utilities, pipeline infrastructure, mediator, and common exception types. K
 
 A Serilog `ILogEventSink` with Channel-based batching, plus the full Watch logging API. Fully standalone — no dependency on Pondhawk.Core. Targets `net10.0` (single target — no conditional compilation).
 
-- **Logging API** (`Pondhawk.Watch` namespace): `SerilogExtensions` provides extensions on both `Serilog.ILogger` and `object`:
-  - **`object.GetLogger()`** — returns a `Serilog.ILogger` with `SourceContext` set to the concise full name of the object's type
-  - **`object.EnterMethod()`** / **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time
+- **Logging API** (`Pondhawk.Watch` namespace): `SerilogExtensions` provides extensions on `Serilog.ILogger`. Obtain a logger the standard Serilog way (e.g. `Log.ForContext<T>()`, which sets `SourceContext` to the type name), then call these on it:
+  - **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time
   - **`ILogger.Inspect(name, value)`** — logs a name/value pair as `"{Name} = {Value}"` at Debug level
   - **`ILogger.LogObject(value)`** — serializes an object to JSON payload
   - **`ILogger.LogJson/LogSql/LogXml/LogYaml/LogText(title, content)`** — typed payload logging with syntax highlighting hints

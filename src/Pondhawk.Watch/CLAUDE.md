@@ -18,24 +18,26 @@ Most methods should begin with `EnterMethod()`. Only the simplest methods (one-l
 
 ```csharp
 using Pondhawk.Watch;
+using Serilog;
 
 public class OrderService
 {
+    private readonly ILogger _logger = Log.ForContext<OrderService>();
+
     public async Task<Order> ProcessOrderAsync(int orderId)
     {
-        using var _ = this.EnterMethod();
-        var logger = this.GetLogger();
+        using var _ = _logger.EnterMethod();
 
-        logger.Debug("Loading order from database");
+        _logger.Debug("Loading order from database");
         var order = await _repository.GetOrderAsync(orderId);
-        logger.LogObject(order);
+        _logger.LogObject(order);
 
         return order;
     }
 }
 ```
 
-- Call `this.GetLogger()` to get a Serilog `ILogger` with `SourceContext` set to the type name
+- Obtain a logger the standard Serilog way — `Log.ForContext<T>()` sets `SourceContext` to the type name
 - Use discard `_` for `EnterMethod()` return value
 - Creates collapsible hierarchy in log viewers with automatic timing
 
@@ -132,8 +134,8 @@ catch (Exception ex)
 
 | Principle | Practice |
 |-----------|----------|
-| Start methods | `using var _ = this.EnterMethod();` |
-| Get a logger | `var logger = this.GetLogger();` |
+| Start methods | `using var _ = _logger.EnterMethod();` |
+| Get a logger | `private readonly ILogger _logger = Log.ForContext<MyType>();` |
 | Replace comments | `logger.Debug("Explanation of what's happening");` |
 | Log values | `logger.Inspect("x", x);` |
 | Log complex objects | `logger.LogObject(dto);` |
@@ -174,15 +176,15 @@ catch (Exception ex)
 ### Method Tracing
 
 ```csharp
-using var scope = this.EnterMethod();     // object extension
-using var scope = logger.EnterMethod();   // ILogger extension
+using var scope = logger.EnterMethod();   // extension on Serilog ILogger
 // Logs entry with Nesting=1, exit with Nesting=-1 and timing
 ```
 
-### Logger Creation (all targets)
+### Logger Creation
 
 ```csharp
-var logger = this.GetLogger();  // SourceContext = type's concise full name
+// Standard Serilog acquisition; sets SourceContext to the type name.
+private readonly ILogger _logger = Log.ForContext<MyType>();
 ```
 
 ### Typed Payloads (all targets)
@@ -268,6 +270,7 @@ logger.Debug($"User {userId} logged in");
 
 ```
 src/Pondhawk.Watch/
+  # Event model + serialization
   PayloadType.cs                        # None, Json, Sql, Xml, Text, Yaml
   WatchPropertyNames.cs                 # Serilog property name constants
   LogEvent.cs                           # Core event model (MemoryPackable)
@@ -275,9 +278,12 @@ src/Pondhawk.Watch/
   LogEventBatchSerializer.cs            # MemoryPack+Brotli wire; JSON for debug/testing
   LogEventBatchContext.cs               # STJ source-gen context (JSON debug/testing)
 
+  # Sink + configuration
   WatchSink.cs                          # ILogEventSink with channel batching + circuit breaker
-  WatchSinkExtensions.cs                # Serilog LoggerConfiguration extension
+  WatchSinkExtensions.cs                # Serilog LoggerConfiguration extensions (UseWatch / Watch)
+  WatchSinkOptions.cs                   # Options for the UseWatch / Watch convenience methods
 
+  # Switching
   Switch.cs                             # Switch model (Pattern, Tag, Level, Color)
   SwitchDef.cs                          # Switch definition DTO
   SwitchDto.cs                          # Wire format for HTTP switch updates
@@ -285,26 +291,23 @@ src/Pondhawk.Watch/
   SwitchSource.cs                       # Local switch source with pattern matching
   WatchSwitchSource.cs                  # Polls Watch Server for switch configuration
 
+  # Logging API
+  SerilogExtensions.cs                  # EnterMethod, Inspect, LogObject, LogJson, etc.
+  MethodLogger.cs                       # ILogger wrapper with method tracing
+  CorrelationManager.cs                 # Activity-based correlation ID management
+  SensitiveAttribute.cs                 # [Sensitive] for masking properties
+
   GlobalUsings.cs                       # Shared usings for the project
 
-  Logging/
-    SerilogExtensions.cs                # GetLogger, EnterMethod, LogObject, LogJson, etc.
-    MethodLogger.cs                     # ILogger wrapper with method tracing
-    ILoggerSource.cs                    # Logger creation abstraction
-    LoggerSource.cs                     # Default ILoggerSource implementation
-    CorrelationManager.cs               # Activity-based correlation ID management
-    SensitiveAttribute.cs               # [Sensitive] for masking properties
-    WatchSwitchConfig.cs                # Switch-based level filtering for extensions
+  Serializers/
+    IObjectSerializer.cs                # Object to payload abstraction
+    JsonObjectSerializer.cs             # System.Text.Json with safe property access
+    LoggingJsonTypeInfoResolver.cs      # Safe getter wrapping + [Sensitive] handling
+    AttributeJsonConverter.cs           # Attribute → { "Name": "..." }
+    TypeJsonConverter.cs                # Type → { "Name": "..." }
 
-    Serializers/
-      IObjectSerializer.cs              # Object to payload abstraction
-      JsonObjectSerializer.cs           # System.Text.Json with safe property access
-      LoggingJsonTypeInfoResolver.cs    # Safe getter wrapping + [Sensitive] handling
-      AttributeJsonConverter.cs         # Attribute → { "Name": "..." }
-      TypeJsonConverter.cs              # Type → { "Name": "..." }
-
-    Utilities/
-      TypeExtensions.cs                 # GetConciseName/GetConciseFullName with caching
+  Utilities/
+    TypeExtensions.cs                   # GetConciseName/GetConciseFullName with caching
 ```
 
 ## Common Mistakes
