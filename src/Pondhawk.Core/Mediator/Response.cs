@@ -17,17 +17,34 @@ namespace Pondhawk.Mediator;
 [SuppressMessage("Design", "CA1000:Do not declare static members on generic types", Justification = "Static factory methods are the intended public construction API for the envelope (Result<T>.Ok-style).")]
 public readonly record struct Response<T>
 {
+    /// <summary>
+    /// The failure carried by <c>default(Response&lt;T&gt;)</c> and by any failure state whose backing
+    /// error is null. A <see cref="Response{T}"/> is a value type, so <c>default</c> — an uninitialized
+    /// field, an unpopulated array slot, a dictionary miss — yields <c>Ok = false</c> with no backing
+    /// error. Rather than let that violate the "error non-null iff not Ok" invariant (and NRE the
+    /// accessors), it reads as this coherent System failure.
+    /// </summary>
+    private static readonly ErrorInfo Uninitialized = new()
+    {
+        Kind = ErrorKind.System,
+        ErrorCode = "System",
+        Explanation = "Response was not initialized.",
+    };
+
+    private readonly bool _ok;
+    private readonly ErrorInfo? _error;
+
     private Response(bool ok, T? value, ErrorInfo? error)
     {
-        Ok = ok;
+        _ok = ok;
         Value = value;
-        Error = error;
+        _error = error;
     }
 
     /// <summary>
     /// Gets a value indicating whether the request succeeded.
     /// </summary>
-    public bool Ok { get; }
+    public bool Ok => _ok;
 
     /// <summary>
     /// Gets the response value. Meaningful only when <see cref="Ok"/> is <see langword="true"/>.
@@ -35,9 +52,11 @@ public readonly record struct Response<T>
     public T? Value { get; }
 
     /// <summary>
-    /// Gets the structured error. Non-<see langword="null"/> if and only if <see cref="Ok"/> is <see langword="false"/>.
+    /// Gets the structured error. Non-<see langword="null"/> if and only if <see cref="Ok"/> is
+    /// <see langword="false"/> — a failure with no backing error (e.g. <c>default</c>) reads as
+    /// <see cref="Uninitialized"/> so the invariant holds on read.
     /// </summary>
-    public ErrorInfo? Error { get; }
+    public ErrorInfo? Error => _ok ? null : (_error ?? Uninitialized);
 
     /// <summary>
     /// Gets a value indicating whether the request failed. The convenience inverse of <see cref="Ok"/>.
