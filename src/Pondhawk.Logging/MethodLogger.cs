@@ -33,7 +33,7 @@ public sealed class MethodLogger : ILogger, IDisposable
     }
 
     /// <summary>
-    /// Logs method exit with elapsed time and sets <c>Watch.Nesting</c> to -1.
+    /// Logs method exit with elapsed time and sets <c>Pondhawk.Nesting</c> to -1.
     /// </summary>
     public void Dispose()
     {

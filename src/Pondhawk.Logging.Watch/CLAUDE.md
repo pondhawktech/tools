@@ -1,28 +1,49 @@
-# Pondhawk.Watch - AI Development Guide
+# Pondhawk.Logging.Watch - AI Development Guide
 
 ## Overview
 
-Pondhawk.Watch is a Serilog `ILogEventSink` with Channel-based batching, plus the full Watch logging API (`SerilogExtensions`). It provides structured logging with method tracing, object serialization, typed payloads, and HTTP sink delivery with circuit-breaker resilience.
+Pondhawk.Logging.Watch is the **Watch Server provider** for [`Pondhawk.Logging`](../Pondhawk.Logging/CLAUDE.md).
+It supplies a Serilog `ILogEventSink` with Channel-based batching, dynamic switch-based level control,
+and a switch-aware `ILoggerSource` (`WatchLogger`/`WatchLoggerSource`). It delivers events over HTTP to
+a Watch Server with circuit-breaker resilience.
 
-Targets `net10.0` (single target — no conditional compilation). Fully standalone — no dependency on Pondhawk.Core.
+The structured logging **API itself** — `EnterMethod`, `Inspect`, `LogObject`, the typed-payload
+helpers, `[Sensitive]` masking, and the `LogPropertyNames` contract — lives in `Pondhawk.Logging`, which
+this package references. See [`../Pondhawk.Logging/CLAUDE.md`](../Pondhawk.Logging/CLAUDE.md) for the full
+logging guide.
+
+Targets `net10.0` (single target — no conditional compilation). References `Pondhawk.Logging`; no
+dependency on Pondhawk.Core.
 
 ---
 
-## Logging Guidelines
+## Logging Guidelines (brief — full guide in Pondhawk.Logging)
 
-**Logging is the primary debugging tool.** You cannot attach a debugger in production, but you can always read logs. Well-structured logging tells you exactly what happened and why.
+The logging conventions below are part of the `Pondhawk.Logging` API (`using Pondhawk.Logging;`). This
+is a condensed reminder; the authoritative version, with the complete extension-method reference, is in
+[`../Pondhawk.Logging/CLAUDE.md`](../Pondhawk.Logging/CLAUDE.md).
 
-### 1. Start Methods with EnterMethod
+**Logging is the primary debugging tool.** You cannot attach a debugger in production, but you can
+always read logs.
 
-Most methods should begin with `EnterMethod()`. Only the simplest methods (one-liners, trivial getters) skip this.
+- **Start methods with `EnterMethod`** — `using var _ = _logger.EnterMethod();`
+- **Logging IS comments** — write a `logger.Debug(...)` instead of a code comment; logs are visible in production.
+- **Log calculated/fetched values** — `logger.Inspect("discount", discount);`
+- **`LogObject` for complex types** — captures full state, catches throwing getters, respects `[Sensitive]`.
+- **Mark sensitive data** — `[Sensitive]` on properties masks them to `"Sensitive - HasValue: true"`.
+- **Provide context / exception context** — include IDs, states, values.
 
 ```csharp
-using Pondhawk.Watch;
-using Serilog;
+using Pondhawk.Logging;
 
 public class OrderService
 {
-    private readonly ILogger _logger = Log.ForContext<OrderService>();
+    private readonly ILogger _logger;
+
+    public OrderService(ILoggerSource loggers)
+    {
+        _logger = loggers.CreateLogger<OrderService>();
+    }
 
     public async Task<Order> ProcessOrderAsync(int orderId)
     {
@@ -37,111 +58,9 @@ public class OrderService
 }
 ```
 
-- Obtain a logger the standard Serilog way — `Log.ForContext<T>()` sets `SourceContext` to the type name
-- Use discard `_` for `EnterMethod()` return value
-- Creates collapsible hierarchy in log viewers with automatic timing
-
-### 2. Logging IS Comments, Comments ARE Logging
-
-**Do not write comments. Write log statements instead.**
-
-The log serves as both runtime documentation AND debugging information. Comments are invisible in production; logs are not.
-
-```csharp
-// BAD - Comment invisible in production
-// Validate the order before processing
-if (!order.IsValid)
-    return null;
-
-// GOOD - Log visible in production, serves as documentation
-logger.Debug("Validating order before processing");
-if (!order.IsValid)
-{
-    logger.Debug("Order validation failed");
-    return null;
-}
-```
-
-### 3. Log Calculated and Fetched Values
-
-When you calculate a value or fetch it from somewhere (database, API, config), log it.
-
-```csharp
-var discount = CalculateDiscount(customer);
-logger.Inspect("discount", discount);
-
-var user = await _repository.GetUserAsync(userId);
-logger.Inspect("user.Email", user?.Email ?? "not found");
-```
-
-### 4. Use LogObject for Complex Types
-
-When fetching objects from a database or receiving complex DTOs, use `LogObject` to capture the full state.
-
-```csharp
-var order = await _db.Orders.FindAsync(orderId);
-logger.LogObject(order);
-
-var response = await _client.GetAsync<ApiResponse>(url);
-logger.LogObject(response);
-```
-
-`LogObject` uses `JsonObjectSerializer` which:
-- **Catches exceptions from property getters** — Some objects (e.g., MemoryStream) have properties that throw when accessed. The serializer catches these and returns defaults.
-- **Respects [Sensitive] attribute** — Properties marked with `[Sensitive]` are masked.
-
-### 5. Mark Sensitive Data with [Sensitive]
-
-Never log passwords, API keys, tokens, or PII. Mark sensitive properties with the `[Sensitive]` attribute:
-
-```csharp
-public class UserCredentials
-{
-    public string Username { get; set; }
-
-    [Sensitive]
-    public string Password { get; set; }
-
-    [Sensitive]
-    public string ApiKey { get; set; }
-}
-
-// Logs: { "Username": "jsmith", "Password": "Sensitive - HasValue: true", "ApiKey": "Sensitive - HasValue: true" }
-logger.LogObject(credentials);
-```
-
-### 6. Provide Context for Problem-Solving
-
-Include relevant IDs, states, and values.
-
-```csharp
-logger.Debug("Processing payment for Order {OrderId}, Amount {Amount}, Customer {CustomerId}",
-    order.Id, order.Total, order.CustomerId);
-```
-
-### 7. Exception Context is Critical
-
-```csharp
-catch (Exception ex)
-{
-    logger.Error(ex, "Failed to process order {OrderId} for customer {CustomerId} with amount {Amount}",
-        orderId, customerId, amount);
-    throw;
-}
-```
-
-### Summary
-
-| Principle | Practice |
-|-----------|----------|
-| Start methods | `using var _ = _logger.EnterMethod();` |
-| Get a logger | `private readonly ILogger _logger = Log.ForContext<MyType>();` |
-| Replace comments | `logger.Debug("Explanation of what's happening");` |
-| Log values | `logger.Inspect("x", x);` |
-| Log complex objects | `logger.LogObject(dto);` |
-| Mark sensitive data | `[Sensitive]` attribute on properties |
-| Provide context | Include IDs, states, relevant values |
-| Exception handling | Include context: IDs, values, state at time of failure |
+Prefer injecting an `ILoggerSource` and calling `CreateLogger<T>()`; `Log.ForContext<T>()` is the
+fallback. When the injected source is a `WatchLoggerSource`, these calls become switch-aware with no
+code change.
 
 ---
 
@@ -161,7 +80,7 @@ catch (Exception ex)
 
 ### Nesting (Method Tracing)
 
-- `EnterMethod()` sets Nesting = 1, dispose sets Nesting = -1
+- `EnterMethod()` (from `Pondhawk.Logging`) sets Nesting = +1, dispose sets Nesting = -1
 - Watch viewers render as collapsible method hierarchy
 - Includes elapsed time measurement
 
@@ -171,38 +90,44 @@ catch (Exception ex)
 - Use `LogJson()`, `LogSql()`, `LogXml()` etc. for explicit types
 - `LogObject()` automatically uses Json type
 
+## WatchLogger / WatchLoggerSource
+
+`WatchLoggerSource` (public `ILoggerSource`) hands out `WatchLogger` instances (internal `ILogger`).
+`WatchLogger.IsEnabled(level)` consults the live `SwitchSource.Lookup(category).Level` instead of a
+static Serilog minimum. Because the whole `Pondhawk.Logging` API gates on `ILogger.IsEnabled`, acquiring
+loggers from a `WatchLoggerSource` makes `LogObject`/`LogPayload`/etc. switch-aware — payloads are not
+serialized when the category's switch has dropped that level — while callers just hold a plain `ILogger`.
+
+To wire this up, share one `SwitchSource` between the sink and the source using the out-param overloads
+of `UseWatch` / `Watch`:
+
+```csharp
+using Pondhawk.Logging;
+using Pondhawk.Logging.Watch;
+using Serilog;
+
+Log.Logger = new LoggerConfiguration()
+    .UseWatch("http://localhost:11000", "MyApp", out var switchSource)
+    .CreateLogger();
+
+// The source shares the sink's switch table, so call-site guards and the
+// sink filter read one source of truth.
+ILoggerSource loggers = new WatchLoggerSource(Log.Logger, switchSource);
+```
+
+`UseWatch(..., out SwitchSource)` and `Watch(..., out SwitchSource)` (and their options-taking
+overloads) expose the internally-created switch source for exactly this purpose.
+
 ## Extension Method Reference
 
-### Method Tracing
-
-```csharp
-using var scope = logger.EnterMethod();   // extension on Serilog ILogger
-// Logs entry with Nesting=1, exit with Nesting=-1 and timing
-```
-
-### Logger Creation
-
-```csharp
-// Standard Serilog acquisition; sets SourceContext to the type name.
-private readonly ILogger _logger = Log.ForContext<MyType>();
-```
-
-### Typed Payloads (all targets)
-
-```csharp
-logger.LogObject(dto);              // Serializes to JSON
-logger.LogJson("Title", jsonStr);   // Raw JSON with highlighting
-logger.LogSql("Query", sqlStr);     // SQL syntax highlighting
-logger.LogXml("Config", xmlStr);    // XML syntax highlighting
-logger.LogYaml("Data", yamlStr);    // YAML syntax highlighting
-logger.LogText("Output", textStr);  // Plain text
-logger.Inspect("name", value);      // Logs "name = value" at Debug
-```
+The extension methods (`EnterMethod`, `Inspect`, `LogObject`, `LogJson`/`LogSql`/`LogXml`/`LogYaml`/`LogText`)
+are defined in `Pondhawk.Logging`. See [`../Pondhawk.Logging/CLAUDE.md`](../Pondhawk.Logging/CLAUDE.md)
+for the complete reference.
 
 ## Sink Configuration
 
 ```csharp
-using Pondhawk.Watch;
+using Pondhawk.Logging.Watch;
 using Serilog;
 
 // Recommended — Watch Server controls log levels via switches
@@ -244,16 +169,21 @@ Log.Logger = new LoggerConfiguration()
 
 ### Logging API ↔ Sink Communication
 
-The logging API (`SerilogExtensions`) writes well-known Serilog property names:
-- `Watch.Nesting` — method tracing depth (+1 enter, -1 exit)
-- `Watch.PayloadType` — int value of `PayloadType` enum
-- `Watch.PayloadContent` — serialized payload string
+The logging API in `Pondhawk.Logging` writes well-known Serilog property names, defined by the public
+`LogPropertyNames` contract in that package:
+- `Pondhawk.Nesting` — method tracing depth (+1 enter, -1 exit)
+- `Pondhawk.PayloadType` — int value of `PayloadType` enum
+- `Pondhawk.PayloadContent` — serialized payload string
 
-`WatchSink.ConvertEvent()` reads these properties from the Serilog `LogEvent` and maps them to the Watch `LogEvent` model.
+`WatchSink` reads these properties from the Serilog `LogEvent` and maps them to the Watch `LogEvent` model.
 
 ## Performance Guidelines
 
-1. **Disabled Levels**: `WatchSwitchConfig.IsEnabled()` check is near-zero cost
+1. **Switch-aware acquisition**: Acquiring loggers from a `WatchLoggerSource` makes the client-side
+   `LogObject`/`LogPayload` guards switch-aware — payloads are not serialized for switch-dropped
+   categories, because `WatchLogger.IsEnabled` consults the live switch level. A plain `Log.ForContext<T>()`
+   logger does **not** get this: under `UseWatch` its `IsEnabled(Verbose)` is always true, so payloads
+   serialize regardless of switches (the sink still drops the event, but after serialization).
 2. **Enabled Levels**: LogEvent allocation, JSON serialization for payloads
 3. **Batching**: Events queued to channel, batched for HTTP delivery
 4. **Hot Path**: Avoid string interpolation before level check
@@ -269,19 +199,15 @@ logger.Debug($"User {userId} logged in");
 ## Project Structure
 
 ```
-src/Pondhawk.Watch/
-  # Event model + serialization
-  PayloadType.cs                        # None, Json, Sql, Xml, Text, Yaml
-  WatchPropertyNames.cs                 # Serilog property name constants
-  LogEvent.cs                           # Core event model (MemoryPackable)
-  LogEventBatch.cs                      # Batch container
-  LogEventBatchSerializer.cs            # MemoryPack+Brotli wire; JSON for debug/testing
-  LogEventBatchContext.cs               # STJ source-gen context (JSON debug/testing)
-
+src/Pondhawk.Logging.Watch/
   # Sink + configuration
   WatchSink.cs                          # ILogEventSink with channel batching + circuit breaker
-  WatchSinkExtensions.cs                # Serilog LoggerConfiguration extensions (UseWatch / Watch)
+  WatchSinkExtensions.cs                # Serilog LoggerConfiguration extensions (UseWatch / Watch, + out-param overloads)
   WatchSinkOptions.cs                   # Options for the UseWatch / Watch convenience methods
+
+  # Switch-aware logger source
+  WatchLogger.cs                        # Internal ILogger whose IsEnabled consults the live switch table
+  WatchLoggerSource.cs                  # Public ILoggerSource handing out WatchLogger (shares a SwitchSource with the sink)
 
   # Switching
   Switch.cs                             # Switch model (Pattern, Tag, Level, Color)
@@ -291,24 +217,18 @@ src/Pondhawk.Watch/
   SwitchSource.cs                       # Local switch source with pattern matching
   WatchSwitchSource.cs                  # Polls Watch Server for switch configuration
 
-  # Logging API
-  SerilogExtensions.cs                  # EnterMethod, Inspect, LogObject, LogJson, etc.
-  MethodLogger.cs                       # ILogger wrapper with method tracing
-  CorrelationManager.cs                 # Activity-based correlation ID management
-  SensitiveAttribute.cs                 # [Sensitive] for masking properties
+  # Event model + serialization
+  LogEvent.cs                           # Core event model (MemoryPackable)
+  LogEventBatch.cs                      # Batch container
+  LogEventBatchSerializer.cs            # MemoryPack+Brotli wire; JSON for debug/testing
+  LogEventBatchContext.cs               # STJ source-gen context (JSON debug/testing)
 
   GlobalUsings.cs                       # Shared usings for the project
-
-  Serializers/
-    IObjectSerializer.cs                # Object to payload abstraction
-    JsonObjectSerializer.cs             # System.Text.Json with safe property access
-    LoggingJsonTypeInfoResolver.cs      # Safe getter wrapping + [Sensitive] handling
-    AttributeJsonConverter.cs           # Attribute → { "Name": "..." }
-    TypeJsonConverter.cs                # Type → { "Name": "..." }
-
-  Utilities/
-    TypeExtensions.cs                   # GetConciseName/GetConciseFullName with caching
 ```
+
+The logging API types (`SerilogExtensions`, `MethodLogger`, `CorrelationManager`, `SensitiveAttribute`,
+`PayloadType`, `LogPropertyNames`, `Serializers/*`, `TypeExtensions`) live in `Pondhawk.Logging`, not
+this package.
 
 ## Common Mistakes
 
@@ -317,3 +237,4 @@ src/Pondhawk.Watch/
 - Do use `EnterMethod()` for method-level tracing
 - Do use appropriate PayloadType for syntax highlighting
 - Don't set color in application code — it comes from Switch configuration
+- To get switch-aware call-site guards, inject a `WatchLoggerSource` (share its `SwitchSource` with the sink); a bare `Log.ForContext<T>()` is not switch-aware

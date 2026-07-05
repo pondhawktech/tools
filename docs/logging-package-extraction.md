@@ -1,6 +1,8 @@
 # Build Brief: Extract `Pondhawk.Logging`, rename Watch to `Pondhawk.Logging.Watch`
 
-Status: **in progress** — Phases 1–4 **done**. Both split test projects pass (Logging 45, Logging.Watch 123). Branch: `refactor/extract-pondhawk-logging`.
+Status: **Phases 1–5 DONE** (in-repo work complete). Full solution builds + **1044 tests pass, 0 failures**. Only Phase 6 (cross-repo `watch-server`) remains, and is out-of-repo / explicitly-authorized. Branch: `refactor/extract-pondhawk-logging`.
+
+Phase 5 notes: `pondhawk-tools.slnx` updated (added both new src + test projects, dropped old Watch). Root `CLAUDE.md` (build commands, architecture split, dependency graph, watch-server note) updated. Package docs rewritten: `Pondhawk.Logging.Watch` README/CLAUDE.md reframed as the provider; new `Pondhawk.Logging` README + CLAUDE.md own the API + `ILoggerSource` guide; `Pondhawk.Logging.csproj` gets PackageReadmeFile. One stale `Watch.Nesting` doc comment in `MethodLogger.cs` neutralized to `Pondhawk.Nesting`.
 
 Phase 4 notes: split `Pondhawk.Watch.Tests` → `Pondhawk.Logging.Tests` (API/serializers/type-extensions + `CollectingSink`, `Logging/` flattened to root) and `Pondhawk.Logging.Watch.Tests` (sink/switch/events). Added `SerilogLoggerSourceTests`, `WatchLoggerTests` (switch-aware `IsEnabled`, `LogObject` skip vs emit, `ForContext` preservation), `WatchLoggerSourceTests`. Two stale `"watch.correlation"` test literals (and the 3 `"Watch.*"` event-construction literals in `WatchSinkTests`) had to be updated to the neutralized names — the only test changes needed, confirming no behavioral regression.
 
