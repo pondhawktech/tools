@@ -132,7 +132,7 @@ public abstract class ValidationBuilder<TFact> : AbstractRuleBuilder, IBuilder
 
         try
         {
-            _currentMutex = Ulid.NewUlid().ToString();
+            _currentMutex = Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
             builder();
         }
         finally
