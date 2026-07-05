@@ -408,7 +408,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
             return correlationId;
         }
 
-        return Ulid.NewUlid().ToString();
+        return Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static string GetCorrelationId()
@@ -420,12 +420,12 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
             if (!string.IsNullOrEmpty(correlation))
                 return correlation!;
 
-            var newId = Ulid.NewUlid().ToString();
+            var newId = Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
             activity.SetBaggage(WatchPropertyNames.CorrelationBaggageKey, newId);
             return newId;
         }
 
-        return Ulid.NewUlid().ToString();
+        return Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static string? BuildStructuredPayload(SerilogEvent logEvent)
@@ -465,7 +465,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
                 kvp => ConvertPropertyValue(kvp.Key)?.ToString() ?? "",
                 kvp => ConvertPropertyValue(kvp.Value),
                 StringComparer.Ordinal),
-            _ => value.ToString()
+            _ => value.ToString(null, System.Globalization.CultureInfo.InvariantCulture)
         };
     }
 

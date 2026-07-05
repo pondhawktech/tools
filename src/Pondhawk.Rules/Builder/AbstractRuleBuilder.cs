@@ -64,7 +64,10 @@ public abstract class AbstractRuleBuilder
     /// <summary>Gets the collection of sink actions used for multi-type rule registration.</summary>
     public ISet<Action<IRuleSink>> Sinks { get; } = new HashSet<Action<IRuleSink>>();
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Loads the rules and sink actions defined by this builder into the specified sink for eventual evaluation.
+    /// </summary>
+    /// <param name="ruleSink">The sink that receives the builder's rules.</param>
     public virtual void LoadRules(IRuleSink ruleSink)
     {
 

@@ -64,7 +64,7 @@ public partial class LogEventBatch
     /// Gets or sets the unique identifier for this batch.
     /// Generated as a ULID for lexicographic sortability.
     /// </summary>
-    public string Uid { get; set; } = Ulid.NewUlid().ToString();
+    public string Uid { get; set; } = Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Gets or sets the domain identifier for multi-tenant deployments.

@@ -43,7 +43,7 @@ public static class CorrelationManager
     /// <returns>An IDisposable that ends the correlation scope when disposed.</returns>
     public static IDisposable Begin()
     {
-        return Begin(Ulid.NewUlid().ToString());
+        return Begin(Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -66,7 +66,7 @@ public static class CorrelationManager
     /// <param name="correlationId">The correlation ID to set. If null, generates a new Ulid.</param>
     public static void Set(string? correlationId = null)
     {
-        var id = correlationId ?? Ulid.NewUlid().ToString();
+        var id = correlationId ?? Ulid.NewUlid().ToString(null, System.Globalization.CultureInfo.InvariantCulture);
         Activity.Current?.SetBaggage(BaggageKey, id);
     }
 
