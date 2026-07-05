@@ -24,7 +24,7 @@ SOFTWARE.
 
 using System.Diagnostics;
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging;
 
 /// <summary>
 /// Provides correlation context for logging operations.
@@ -34,7 +34,7 @@ public static class CorrelationManager
     /// <summary>
     /// The baggage key used to store the Watch correlation ID.
     /// </summary>
-    public const string BaggageKey = "watch.correlation";
+    public const string BaggageKey = LogPropertyNames.CorrelationBaggageKey;
 
     /// <summary>
     /// Begins a new correlation scope with a fresh Ulid.

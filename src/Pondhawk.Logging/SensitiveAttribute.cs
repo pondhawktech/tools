@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging;
 
 /// <summary>
 /// Marks a property or field as containing sensitive data that should not be logged.

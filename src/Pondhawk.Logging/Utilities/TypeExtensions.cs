@@ -24,7 +24,7 @@ SOFTWARE.
 
 using System.Collections.Concurrent;
 
-namespace Pondhawk.Watch.Utilities;
+namespace Pondhawk.Logging.Utilities;
 
 /// <summary>
 /// Extension methods for Type to get readable type names.

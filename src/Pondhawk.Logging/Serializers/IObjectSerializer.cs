@@ -22,29 +22,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging;
 
 /// <summary>
-/// Specifies the type of payload content in a log event.
-/// Used by UI viewers to provide appropriate syntax highlighting and formatting.
+/// Serializes objects to a string format for log event payloads.
 /// </summary>
-public enum PayloadType
+public interface IObjectSerializer
 {
-    /// <summary>No payload content.</summary>
-    None = 0,
-
-    /// <summary>JSON-formatted content. Displayed with JavaScript/JSON syntax highlighting.</summary>
-    Json = 1,
-
-    /// <summary>SQL query content. Displayed with SQL syntax highlighting.</summary>
-    Sql = 2,
-
-    /// <summary>XML content. Displayed with XML syntax highlighting.</summary>
-    Xml = 3,
-
-    /// <summary>Plain text content. Displayed without syntax highlighting.</summary>
-    Text = 4,
-
-    /// <summary>YAML content. Displayed with YAML syntax highlighting.</summary>
-    Yaml = 5
+    /// <summary>
+    /// Serializes an object to a string.
+    /// </summary>
+    /// <param name="source">The object to serialize.</param>
+    /// <returns>A tuple containing the payload type and serialized string.</returns>
+    (PayloadType Type, string Payload) Serialize(object? source);
 }

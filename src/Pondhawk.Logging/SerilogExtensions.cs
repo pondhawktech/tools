@@ -1,11 +1,11 @@
 using System.Runtime.CompilerServices;
-using Pondhawk.Watch.Serializers;
-using Pondhawk.Watch.Utilities;
+using Pondhawk.Logging.Serializers;
+using Pondhawk.Logging.Utilities;
 using Serilog;
 using Serilog.Events;
 #pragma warning disable CA2254
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging;
 
 /// <summary>
 /// Extension methods on <see cref="Serilog.ILogger"/> for method tracing, object serialization, and typed payloads.
@@ -29,7 +29,7 @@ public static class SerilogExtensions
         if (tracing)
         {
             logger
-                .ForContext(WatchPropertyNames.Nesting, 1)
+                .ForContext(LogPropertyNames.Nesting, 1)
                 .Verbose("Entering {Method}", method);
         }
 
@@ -54,8 +54,8 @@ public static class SerilogExtensions
         var typeName = typeof(T).GetConciseName();
 
         logger
-            .ForContext(WatchPropertyNames.PayloadType, (int)PayloadType.Json)
-            .ForContext(WatchPropertyNames.PayloadContent, json)
+            .ForContext(LogPropertyNames.PayloadType, (int)PayloadType.Json)
+            .ForContext(LogPropertyNames.PayloadContent, json)
             .Write(LogEventLevel.Verbose, typeName);
     }
 
@@ -77,8 +77,8 @@ public static class SerilogExtensions
         var (_, json) = JsonObjectSerializer.Instance.Serialize(value);
 
         logger
-            .ForContext(WatchPropertyNames.PayloadType, (int)PayloadType.Json)
-            .ForContext(WatchPropertyNames.PayloadContent, json)
+            .ForContext(LogPropertyNames.PayloadType, (int)PayloadType.Json)
+            .ForContext(LogPropertyNames.PayloadContent, json)
             .Write(LogEventLevel.Verbose, title);
     }
 
@@ -177,8 +177,8 @@ public static class SerilogExtensions
             return;
 
         logger
-            .ForContext(WatchPropertyNames.PayloadType, (int)payloadType)
-            .ForContext(WatchPropertyNames.PayloadContent, content ?? string.Empty)
+            .ForContext(LogPropertyNames.PayloadType, (int)payloadType)
+            .ForContext(LogPropertyNames.PayloadContent, content ?? string.Empty)
             .Write(level, title);
     }
 }

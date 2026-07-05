@@ -6,7 +6,7 @@ using Serilog.Events;
 using SerilogLogEvent = Serilog.Events.LogEvent;
 #pragma warning disable CA2254
 
-namespace Pondhawk.Watch;
+namespace Pondhawk.Logging;
 
 /// <summary>
 /// A disposable ILogger wrapper returned by EnterMethod.
@@ -46,7 +46,7 @@ public sealed class MethodLogger : ILogger, IDisposable
         {
             var elapsed = Stopwatch.GetElapsedTime(_startTimestamp);
             _logger
-                .ForContext(WatchPropertyNames.Nesting, -1)
+                .ForContext(LogPropertyNames.Nesting, -1)
                 .Verbose("Exiting {Method} ({Elapsed:F2}ms)", _method, elapsed.TotalMilliseconds);
         }
     }

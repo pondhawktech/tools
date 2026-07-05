@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Pondhawk.Watch.Utilities;
+using Pondhawk.Logging.Utilities;
 
-namespace Pondhawk.Watch.Serializers;
+namespace Pondhawk.Logging.Serializers;
 
 /// <summary>
 /// JSON converter for Attribute objects.
