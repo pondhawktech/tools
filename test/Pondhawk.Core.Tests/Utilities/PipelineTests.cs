@@ -57,6 +57,9 @@ public class PipelineTests
         }
     }
 
+    // Uses the base BasePipelineStep.Before/After no-op hooks without overriding them.
+    private sealed class PlainStep : BasePipelineStep<TestContext>, IPipelineStep<TestContext>;
+
     // Parameterless for DI registration
     private class DiLoggingStep() : LoggingStep("DI");
 
@@ -206,6 +209,59 @@ public class PipelineTests
 
         await Should.ThrowAsync<ArgumentNullException>(
             () => ((IPipelineStep<TestContext>)step).InvokeAsync(ctx, null));
+    }
+
+    [Fact]
+    public async Task BasePipelineStep_DefaultHooks_PassThroughToContinuation()
+    {
+        // A step that does not override Before/After exercises the base no-op hooks.
+        var step = new PlainStep();
+        var ctx = new TestContext();
+        var continued = false;
+
+        await ((IPipelineStep<TestContext>)step).InvokeAsync(ctx, c =>
+        {
+            continued = true;
+            c.Log.Add("Action");
+            return Task.CompletedTask;
+        });
+
+        continued.ShouldBeTrue();
+        ctx.Log.ShouldBe(["Action"]);
+        ctx.Success.ShouldBeTrue();
+    }
+
+    // ── ActionPipelineStep ──
+
+    [Fact]
+    public async Task ActionPipelineStep_InvokesAction_AndSetsPhaseToAfter()
+    {
+        var ran = false;
+        var step = new ActionPipelineStep<TestContext>(c =>
+        {
+            ran = true;
+            c.Log.Add("Action");
+            return Task.CompletedTask;
+        });
+        var ctx = new TestContext();
+
+        await step.InvokeAsync(ctx, _ => Task.CompletedTask);
+
+        ran.ShouldBeTrue();
+        ctx.Log.ShouldBe(["Action"]);
+        ctx.Phase.ShouldBe(PipelinePhase.After);
+    }
+
+    [Fact]
+    public void ActionPipelineStep_ContinueAfterFailure_DefaultsFalse_AndIsSettable()
+    {
+        var step = new ActionPipelineStep<TestContext>(_ => Task.CompletedTask);
+
+        step.ContinueAfterFailure.ShouldBeFalse();
+
+        step.ContinueAfterFailure = true;
+
+        step.ContinueAfterFailure.ShouldBeTrue();
     }
 
     // ── BasePipelineContext ──
