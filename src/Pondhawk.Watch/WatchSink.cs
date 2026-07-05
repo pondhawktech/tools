@@ -29,6 +29,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
 {
     private readonly HttpClient _client;
     private readonly SwitchSource _switchSource;
+    private readonly bool _ownsDependencies;
     private readonly string _domain;
     private readonly int _batchSize;
     private readonly TimeSpan _flushInterval;
@@ -99,12 +100,19 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
     /// <param name="domain">The domain name included in each batch. Defaults to "Default".</param>
     /// <param name="batchSize">Maximum events per batch before flushing. Defaults to 100.</param>
     /// <param name="flushInterval">Maximum time before flushing a partial batch. Defaults to 100ms.</param>
+    /// <param name="ownsDependencies">
+    /// When <see langword="true"/>, the sink disposes <paramref name="switchSource"/> and
+    /// <paramref name="client"/> on disposal (they were created for it). When <see langword="false"/>
+    /// (the default, for the low-level API where the caller supplies these), the sink only stops the
+    /// switch source and leaves both for the caller to dispose.
+    /// </param>
     public WatchSink(
         HttpClient client,
         SwitchSource switchSource,
         string domain = "Default",
         int batchSize = 100,
-        TimeSpan? flushInterval = null)
+        TimeSpan? flushInterval = null,
+        bool ownsDependencies = false)
     {
         Guard.IsNotNull(client);
         Guard.IsNotNull(switchSource);
@@ -112,6 +120,7 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
 
         _client = client;
         _switchSource = switchSource;
+        _ownsDependencies = ownsDependencies;
         _domain = domain;
         _batchSize = batchSize;
         _flushInterval = flushInterval ?? TimeSpan.FromMilliseconds(100);
@@ -178,7 +187,15 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
 
                 if (batch.Count > 0)
                 {
-                    await FlushBatchAsync(batch).ConfigureAwait(false);
+                    try
+                    {
+                        await FlushBatchAsync(batch).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // Backstop: the drain loop must outlive any single batch failure.
+                        // Losing one batch is acceptable; silently killing all delivery is not.
+                    }
                 }
             }
         }
@@ -194,7 +211,18 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
 
         foreach (var serilogEvent in events)
         {
-            var converted = ConvertEvent(serilogEvent);
+            LogEvent? converted;
+            try
+            {
+                converted = ConvertEvent(serilogEvent);
+            }
+            catch
+            {
+                // A single malformed event (e.g. a property whose ToString throws) must never
+                // abort the batch — skip it rather than lose everything behind it.
+                continue;
+            }
+
             if (converted is not null)
                 watchBatch.Events.Add(converted);
         }
@@ -339,8 +367,14 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
         }
         else if (serilogEvent.Exception is not null)
         {
-            le.ErrorType = serilogEvent.Exception.GetType().FullName ?? serilogEvent.Exception.GetType().Name;
-            le.Error = serilogEvent.Exception;
+            var exception = serilogEvent.Exception;
+            le.ErrorType = exception.GetType().FullName ?? exception.GetType().Name;
+
+            // Transmit the full exception detail (message + stack trace) on the wire. The
+            // ignored Error member is an in-process staging field; the type name alone is not
+            // enough to diagnose a failure, so carry ToString() as a text payload.
+            le.Type = (int)PayloadType.Text;
+            le.Payload = exception.ToString();
         }
         else
         {
@@ -454,7 +488,15 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
             // Ignore exceptions during disposal
         }
 
-        _switchSource.Stop();
+        if (_ownsDependencies)
+        {
+            _switchSource.Dispose();
+            _client.Dispose();
+        }
+        else
+        {
+            _switchSource.Stop();
+        }
     }
 
     /// <summary>
@@ -477,6 +519,18 @@ public sealed class WatchSink : ILogEventSink, IDisposable, IAsyncDisposable
             // Ignore exceptions during disposal (including timeout)
         }
 
-        _switchSource.Stop();
+        if (_ownsDependencies)
+        {
+            if (_switchSource is IAsyncDisposable asyncDisposable)
+                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            else
+                _switchSource.Dispose();
+
+            _client.Dispose();
+        }
+        else
+        {
+            _switchSource.Stop();
+        }
     }
 }

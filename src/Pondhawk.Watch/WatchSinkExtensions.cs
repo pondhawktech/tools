@@ -100,8 +100,19 @@ public static class WatchSinkExtensions
         var httpClient = new HttpClient { BaseAddress = new Uri(normalizedUrl) };
         var switchSource = new WatchSwitchSource(httpClient, options.Domain, options.PollInterval);
         switchSource.WhenNotMatched(options.DefaultLevel, options.DefaultColor);
+        switchSource.Start();
 
-        return WatchSink(config, httpClient, switchSource, options.Domain, options.BatchSize, options.FlushInterval);
+        // These dependencies were created here for the sink, so the sink owns their disposal
+        // (the low-level WatchSink overload below leaves caller-supplied dependencies alone).
+        var sink = new WatchSink(
+            httpClient,
+            switchSource,
+            options.Domain,
+            options.BatchSize,
+            options.FlushInterval,
+            ownsDependencies: true);
+
+        return config.Sink(sink);
     }
 
     /// <summary>

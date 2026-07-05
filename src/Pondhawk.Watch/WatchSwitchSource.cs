@@ -52,6 +52,7 @@ public class WatchSwitchSource : SwitchSource, IAsyncDisposable
     private readonly ManualResetEventSlim _ready = new(false);
     private Task? _pollTask;
     private bool _started;
+    private int _lifecycleDisposed;
 
     /// <summary>
     /// Gets or sets whether polling is enabled. Default is true.
@@ -174,27 +175,49 @@ public class WatchSwitchSource : SwitchSource, IAsyncDisposable
     }
 
     /// <summary>
-    /// Disposes the switch source.
+    /// Disposes the switch source, cancelling polling, awaiting the background task, and releasing
+    /// the cancellation source, ready handle, and switch lock.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        Stop();
-
-        if (_pollTask is not null)
+        if (Interlocked.Exchange(ref _lifecycleDisposed, 1) == 0)
         {
-            try
+            _cts.Cancel();
+
+            if (_pollTask is not null)
             {
-                await _pollTask.ConfigureAwait(false);
+                try
+                {
+                    await _pollTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected on shutdown
+                }
             }
-            catch (OperationCanceledException)
-            {
-                // Expected on shutdown
-            }
+
+            _cts.Dispose();
+            _ready.Dispose();
         }
 
-        _cts.Dispose();
-        _ready.Dispose();
-        Dispose(true);
+        base.Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases the switch source's polling resources. Complements the base switch-lock disposal so
+    /// the synchronous path fully cleans up (the async path additionally awaits the poll task).
+    /// </summary>
+    /// <param name="disposing">True if called from Dispose; false if from a finalizer.</param>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && Interlocked.Exchange(ref _lifecycleDisposed, 1) == 0)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+            _ready.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }
