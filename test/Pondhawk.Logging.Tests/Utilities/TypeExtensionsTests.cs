@@ -1,8 +1,8 @@
-using Pondhawk.Watch.Utilities;
+using Pondhawk.Logging.Utilities;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Utilities;
+namespace Pondhawk.Logging.Tests.Utilities;
 
 public class TypeExtensionsTests
 {

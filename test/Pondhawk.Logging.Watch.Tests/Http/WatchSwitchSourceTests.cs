@@ -5,7 +5,7 @@ using Serilog.Events;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Http;
+namespace Pondhawk.Logging.Watch.Tests.Http;
 
 public class WatchSwitchSourceTests
 {

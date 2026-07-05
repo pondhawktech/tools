@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using System.Net;
-using Pondhawk.Watch.Tests.Http;
+using Pondhawk.Logging.Watch.Tests.Http;
 using Serilog.Events;
 using Shouldly;
 using Xunit;
 using SerilogEvent = Serilog.Events.LogEvent;
 
-namespace Pondhawk.Watch.Tests;
+namespace Pondhawk.Logging.Watch.Tests;
 
 public class WatchSinkTests
 {
@@ -106,7 +106,7 @@ public class WatchSinkTests
 
         var props = new List<LogEventProperty>
         {
-            new("Watch.Nesting", new ScalarValue(1))
+            new(LogPropertyNames.Nesting, new ScalarValue(1))
         };
         await sink.FlushBatchAsync(MakeEventList(properties: props));
 
@@ -124,8 +124,8 @@ public class WatchSinkTests
 
         var props = new List<LogEventProperty>
         {
-            new("Watch.PayloadType", new ScalarValue(1)),
-            new("Watch.PayloadContent", new ScalarValue("{\"key\":\"value\"}"))
+            new(LogPropertyNames.PayloadType, new ScalarValue(1)),
+            new(LogPropertyNames.PayloadContent, new ScalarValue("{\"key\":\"value\"}"))
         };
         await sink.FlushBatchAsync(MakeEventList(properties: props));
 
@@ -293,7 +293,7 @@ public class WatchSinkTests
         var sink = new WatchSink(CreateClient(handler), CreateSwitchSource(), "test");
 
         using var activity = new Activity("TestCorrelation");
-        activity.SetBaggage("watch.correlation", "test-correlation-123");
+        activity.SetBaggage(LogPropertyNames.CorrelationBaggageKey, "test-correlation-123");
         activity.Start();
 
         await sink.FlushBatchAsync(MakeEventList(sourceContext: "MyApp"));
@@ -316,7 +316,7 @@ public class WatchSinkTests
 
         sink.Emit(MakeSerilogEvent(sourceContext: "MyApp"));
 
-        var correlation = activity.GetBaggageItem("watch.correlation");
+        var correlation = activity.GetBaggageItem(LogPropertyNames.CorrelationBaggageKey);
         correlation.ShouldNotBeNullOrEmpty();
 
         sink.Dispose();

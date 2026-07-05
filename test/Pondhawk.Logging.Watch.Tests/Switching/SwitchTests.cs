@@ -3,7 +3,7 @@ using Serilog.Events;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Switching;
+namespace Pondhawk.Logging.Watch.Tests.Switching;
 
 public class SwitchTests
 {

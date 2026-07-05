@@ -1,9 +1,9 @@
-using Pondhawk.Watch.Tests.Support;
+using Pondhawk.Logging.Tests.Support;
 using Serilog.Events;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Logging;
+namespace Pondhawk.Logging.Tests;
 
 public class SerilogExtensionsTests
 {
@@ -18,8 +18,8 @@ public class SerilogExtensionsTests
 
         var e = sink.Events.ShouldHaveSingleItem();
         e.Level.ShouldBe(LogEventLevel.Verbose);
-        CollectingSink.Prop(e, WatchPropertyNames.PayloadType).ShouldBe((int)PayloadType.Json);
-        var json = (string)CollectingSink.Prop(e, WatchPropertyNames.PayloadContent)!;
+        CollectingSink.Prop(e, LogPropertyNames.PayloadType).ShouldBe((int)PayloadType.Json);
+        var json = (string)CollectingSink.Prop(e, LogPropertyNames.PayloadContent)!;
         json.ShouldContain("Ada");
         json.ShouldContain("36");
     }
@@ -33,7 +33,7 @@ public class SerilogExtensionsTests
 
         var e = sink.Events.ShouldHaveSingleItem();
         CollectingSink.Text(e).ShouldBe("The user");
-        CollectingSink.Prop(e, WatchPropertyNames.PayloadType).ShouldBe((int)PayloadType.Json);
+        CollectingSink.Prop(e, LogPropertyNames.PayloadType).ShouldBe((int)PayloadType.Json);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class SerilogExtensionsTests
 
         var e = sink.Events.ShouldHaveSingleItem();
         CollectingSink.Text(e).ShouldBe("t");
-        CollectingSink.Prop(e, WatchPropertyNames.PayloadType).ShouldBe((int)type);
+        CollectingSink.Prop(e, LogPropertyNames.PayloadType).ShouldBe((int)type);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class SerilogExtensionsTests
         logger.LogJson("t", null);
 
         var e = sink.Events.ShouldHaveSingleItem();
-        CollectingSink.Prop(e, WatchPropertyNames.PayloadContent).ShouldBe(string.Empty);
+        CollectingSink.Prop(e, LogPropertyNames.PayloadContent).ShouldBe(string.Empty);
     }
 
     [Fact]
@@ -138,10 +138,10 @@ public class SerilogExtensionsTests
 
         CollectingSink.Text(entry).ShouldBe("Entering {Method}");
         CollectingSink.Prop(entry, "Method").ShouldBe(nameof(EnterMethod_LogsEntryAndExit_WithNesting));
-        CollectingSink.Prop(entry, WatchPropertyNames.Nesting).ShouldBe(1);
+        CollectingSink.Prop(entry, LogPropertyNames.Nesting).ShouldBe(1);
 
         CollectingSink.Text(exit).ShouldBe("Exiting {Method} ({Elapsed:F2}ms)");
-        CollectingSink.Prop(exit, WatchPropertyNames.Nesting).ShouldBe(-1);
+        CollectingSink.Prop(exit, LogPropertyNames.Nesting).ShouldBe(-1);
     }
 
     [Fact]

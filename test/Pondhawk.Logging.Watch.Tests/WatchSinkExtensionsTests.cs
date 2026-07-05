@@ -4,7 +4,7 @@ using Serilog.Events;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests;
+namespace Pondhawk.Logging.Watch.Tests;
 
 public class WatchSinkExtensionsTests
 {

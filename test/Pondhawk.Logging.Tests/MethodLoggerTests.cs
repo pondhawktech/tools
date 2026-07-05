@@ -1,10 +1,10 @@
-using Pondhawk.Watch.Tests.Support;
+using Pondhawk.Logging.Tests.Support;
 using Serilog;
 using Serilog.Events;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Logging;
+namespace Pondhawk.Logging.Tests;
 
 public class MethodLoggerTests
 {

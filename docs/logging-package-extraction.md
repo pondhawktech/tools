@@ -1,6 +1,8 @@
 # Build Brief: Extract `Pondhawk.Logging`, rename Watch to `Pondhawk.Logging.Watch`
 
-Status: **in progress** — Phases 1–3 **done** (all src projects build 0/0). Branch: `refactor/extract-pondhawk-logging`.
+Status: **in progress** — Phases 1–4 **done**. Both split test projects pass (Logging 45, Logging.Watch 123). Branch: `refactor/extract-pondhawk-logging`.
+
+Phase 4 notes: split `Pondhawk.Watch.Tests` → `Pondhawk.Logging.Tests` (API/serializers/type-extensions + `CollectingSink`, `Logging/` flattened to root) and `Pondhawk.Logging.Watch.Tests` (sink/switch/events). Added `SerilogLoggerSourceTests`, `WatchLoggerTests` (switch-aware `IsEnabled`, `LogObject` skip vs emit, `ForContext` preservation), `WatchLoggerSourceTests`. Two stale `"watch.correlation"` test literals (and the 3 `"Watch.*"` event-construction literals in `WatchSinkTests`) had to be updated to the neutralized names — the only test changes needed, confirming no behavioral regression.
 
 Phase 3 notes: `TypeExtensions` made **public** in Pondhawk.Logging (both logger sources must derive categories identically, and custom `ILoggerSource` impls benefit). `WatchLogger.IsEnabled` guards a blank category by delegating to the inner logger (`SwitchSource.Lookup` throws on blank). Exposed the `SwitchSource` via new `UseWatch`/`Watch` **out-param overloads** (CA1021 is off) so the root can share one instance with `WatchLoggerSource`. The switch-aware unit test is folded into Phase 4 (the test project is mid-migration).
 

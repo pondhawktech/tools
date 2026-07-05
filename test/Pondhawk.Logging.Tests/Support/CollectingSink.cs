@@ -3,7 +3,7 @@ using Serilog.Core;
 using Serilog.Events;
 using SerilogEvent = Serilog.Events.LogEvent;
 
-namespace Pondhawk.Watch.Tests.Support;
+namespace Pondhawk.Logging.Tests.Support;
 
 /// <summary>
 /// A Serilog sink that captures emitted events in memory for assertion.

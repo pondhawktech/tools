@@ -1,8 +1,8 @@
-﻿using Pondhawk.Watch;
+﻿using Pondhawk.Logging;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Logging;
+namespace Pondhawk.Logging.Tests;
 
 public class CorrelationManagerTests
 {
@@ -10,7 +10,7 @@ public class CorrelationManagerTests
     [Fact]
     public void BaggageKey_IsExpectedValue()
     {
-        CorrelationManager.BaggageKey.ShouldBe("watch.correlation");
+        CorrelationManager.BaggageKey.ShouldBe("pondhawk.correlation");
     }
 
     [Fact]

@@ -1,9 +1,9 @@
 using System.Text.Json;
-using Pondhawk.Watch.Serializers;
+using Pondhawk.Logging.Serializers;
 using Shouldly;
 using Xunit;
 
-namespace Pondhawk.Watch.Tests.Serializers;
+namespace Pondhawk.Logging.Tests.Serializers;
 
 public class JsonConvertersTests
 {

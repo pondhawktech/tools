@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace Pondhawk.Watch.Tests.Http;
+namespace Pondhawk.Logging.Watch.Tests.Http;
 
 /// <summary>
 /// A test HttpMessageHandler that delegates to a configurable function.

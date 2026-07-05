@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Pondhawk.Watch\Pondhawk.Watch.csproj" />
+    <ProjectReference Include="..\..\src\Pondhawk.Logging\Pondhawk.Logging.csproj" />
   </ItemGroup>
 
 </Project>

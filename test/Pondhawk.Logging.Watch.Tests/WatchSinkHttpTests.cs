@@ -1,11 +1,11 @@
 ﻿using System.Net;
-using Pondhawk.Watch.Tests.Http;
+using Pondhawk.Logging.Watch.Tests.Http;
 using Serilog.Events;
 using Shouldly;
 using Xunit;
 using SerilogEvent = Serilog.Events.LogEvent;
 
-namespace Pondhawk.Watch.Tests;
+namespace Pondhawk.Logging.Watch.Tests;
 
 public class WatchSinkHttpTests
 {
