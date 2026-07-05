@@ -1,6 +1,8 @@
 # Build Brief: Extract `Pondhawk.Logging`, rename Watch to `Pondhawk.Logging.Watch`
 
-Status: **in progress** — Phases 1–2 **done** (both src projects build 0/0). Branch: `refactor/extract-pondhawk-logging`.
+Status: **in progress** — Phases 1–3 **done** (all src projects build 0/0). Branch: `refactor/extract-pondhawk-logging`.
+
+Phase 3 notes: `TypeExtensions` made **public** in Pondhawk.Logging (both logger sources must derive categories identically, and custom `ILoggerSource` impls benefit). `WatchLogger.IsEnabled` guards a blank category by delegating to the inner logger (`SwitchSource.Lookup` throws on blank). Exposed the `SwitchSource` via new `UseWatch`/`Watch` **out-param overloads** (CA1021 is off) so the root can share one instance with `WatchLoggerSource`. The switch-aware unit test is folded into Phase 4 (the test project is mid-migration).
 
 Phase 2 notes: only `WatchSink.cs` needed repointing (`LogPropertyNames` + `PayloadType` via `using Pondhawk.Logging;`, and the `StartsWith("Watch.")` filter → `LogPropertyNames.Prefix`); `LogEvent.cs`'s only "PayloadType" mention was a comment. Solution `.slnx` and test projects still reference the old `Pondhawk.Watch` path — fixed in Phases 4–5.
 

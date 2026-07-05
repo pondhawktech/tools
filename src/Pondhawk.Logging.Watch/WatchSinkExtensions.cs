@@ -58,6 +58,49 @@ public static class WatchSinkExtensions
     }
 
     /// <summary>
+    /// Like <see cref="UseWatch(LoggerConfiguration, string, string)"/> but also exposes the
+    /// <see cref="SwitchSource"/> so it can be shared with a <see cref="WatchLoggerSource"/> for
+    /// switch-aware, call-site payload skipping.
+    /// </summary>
+    /// <param name="config">The Serilog logger configuration.</param>
+    /// <param name="serverUrl">The Watch Server URL.</param>
+    /// <param name="domain">The domain name for log event batches.</param>
+    /// <param name="switchSource">Receives the switch source the sink was wired with.</param>
+    /// <returns>The logger configuration for chaining.</returns>
+    public static LoggerConfiguration UseWatch(
+        this LoggerConfiguration config,
+        string serverUrl,
+        string domain,
+        out SwitchSource switchSource)
+    {
+        return UseWatch(config, serverUrl, domain, _ => { }, out switchSource);
+    }
+
+    /// <summary>
+    /// Like <see cref="UseWatch(LoggerConfiguration, string, string, Action{WatchSinkOptions})"/> but
+    /// also exposes the <see cref="SwitchSource"/> for sharing with a <see cref="WatchLoggerSource"/>.
+    /// </summary>
+    /// <param name="config">The Serilog logger configuration.</param>
+    /// <param name="serverUrl">The Watch Server URL.</param>
+    /// <param name="domain">The domain name for log event batches.</param>
+    /// <param name="configure">An action to customize the sink options.</param>
+    /// <param name="switchSource">Receives the switch source the sink was wired with.</param>
+    /// <returns>The logger configuration for chaining.</returns>
+    public static LoggerConfiguration UseWatch(
+        this LoggerConfiguration config,
+        string serverUrl,
+        string domain,
+        Action<WatchSinkOptions> configure,
+        out SwitchSource switchSource)
+    {
+        Guard.IsNotNull(config);
+
+        return config
+            .MinimumLevel.Verbose()
+            .WriteTo.Watch(serverUrl, domain, configure, out switchSource);
+    }
+
+    /// <summary>
     /// Adds a Watch sink using just a server URL and domain.
     /// Creates the HttpClient and WatchSwitchSource internally.
     /// </summary>
@@ -88,6 +131,27 @@ public static class WatchSinkExtensions
         string domain,
         Action<WatchSinkOptions> configure)
     {
+        return Watch(config, serverUrl, domain, configure, out _);
+    }
+
+    /// <summary>
+    /// Adds a Watch sink and exposes the internally-created <see cref="SwitchSource"/> so it can be
+    /// shared with a <see cref="WatchLoggerSource"/> — the call-site switch-aware guard and the sink
+    /// filter then read one source of truth.
+    /// </summary>
+    /// <param name="config">The Serilog sink configuration.</param>
+    /// <param name="serverUrl">The Watch Server URL.</param>
+    /// <param name="domain">The domain name for log event batches.</param>
+    /// <param name="configure">An action to customize the sink options.</param>
+    /// <param name="switchSource">Receives the switch source the sink was wired with.</param>
+    /// <returns>The logger configuration for chaining.</returns>
+    public static LoggerConfiguration Watch(
+        this LoggerSinkConfiguration config,
+        string serverUrl,
+        string domain,
+        Action<WatchSinkOptions> configure,
+        out SwitchSource switchSource)
+    {
         Guard.IsNotNull(config);
         Guard.IsNotNullOrWhiteSpace(serverUrl);
         Guard.IsNotNullOrWhiteSpace(domain);
@@ -98,20 +162,21 @@ public static class WatchSinkExtensions
 
         var normalizedUrl = options.ServerUrl.TrimEnd('/') + "/";
         var httpClient = new HttpClient { BaseAddress = new Uri(normalizedUrl) };
-        var switchSource = new WatchSwitchSource(httpClient, options.Domain, options.PollInterval);
-        switchSource.WhenNotMatched(options.DefaultLevel, options.DefaultColor);
-        switchSource.Start();
+        var source = new WatchSwitchSource(httpClient, options.Domain, options.PollInterval);
+        source.WhenNotMatched(options.DefaultLevel, options.DefaultColor);
+        source.Start();
 
         // These dependencies were created here for the sink, so the sink owns their disposal
         // (the low-level WatchSink overload below leaves caller-supplied dependencies alone).
         var sink = new WatchSink(
             httpClient,
-            switchSource,
+            source,
             options.Domain,
             options.BatchSize,
             options.FlushInterval,
             ownsDependencies: true);
 
+        switchSource = source;
         return config.Sink(sink);
     }
 

@@ -29,7 +29,7 @@ namespace Pondhawk.Logging.Utilities;
 /// <summary>
 /// Extension methods for Type to get readable type names.
 /// </summary>
-internal static class TypeExtensions
+public static class TypeExtensions
 {
     private static readonly ConcurrentDictionary<Type, string> ConciseNameCache = new();
     private static readonly ConcurrentDictionary<Type, string> ConciseFullNameCache = new();
