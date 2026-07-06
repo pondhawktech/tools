@@ -37,7 +37,12 @@ public class CompactJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
             return static (_, value) => !string.IsNullOrWhiteSpace(value as string);
 
         if (typeof(IEnumerable).IsAssignableFrom(type))
-            return static (_, value) => value is IEnumerable sequence && sequence.GetEnumerator().MoveNext();
+            return static (_, value) => value switch
+            {
+                ICollection collection => collection.Count > 0,
+                IEnumerable sequence => HasAny(sequence),
+                _ => false,
+            };
 
         if (type == typeof(DateTime))
             return static (_, value) => value is DateTime d && d != DateTime.MinValue;
@@ -52,6 +57,19 @@ public class CompactJsonTypeInfoResolver : DefaultJsonTypeInfoResolver
             return static (_, value) => value is not null && !IsZero(value);
 
         return null;
+    }
+
+    private static bool HasAny(IEnumerable sequence)
+    {
+        var enumerator = sequence.GetEnumerator();
+        try
+        {
+            return enumerator.MoveNext();
+        }
+        finally
+        {
+            (enumerator as IDisposable)?.Dispose();
+        }
     }
 
     private static bool IsZero(object value) => value switch

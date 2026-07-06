@@ -25,7 +25,12 @@ public sealed class DiagnosticsEnrichmentMiddleware(RequestDelegate next)
             ? values[0]
             : null;
 
-        CorrelationManager.Set(incoming);
+        if (!string.IsNullOrWhiteSpace(incoming))
+            requestContext.CorrelationId = incoming;
+
+        // Flow the resolved id (reading CorrelationId generates one if needed) to the ambient
+        // logging correlation, so log events carry it when an Activity is present.
+        CorrelationManager.Set(requestContext.CorrelationId);
 
         requestContext.Caller = context.User;
 
