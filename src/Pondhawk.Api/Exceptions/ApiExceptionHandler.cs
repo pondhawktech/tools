@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Pondhawk.Api.Context;
 using Pondhawk.Exceptions;
 using Serilog;
@@ -13,7 +14,12 @@ namespace Pondhawk.Api.Exceptions;
 /// keeps its <see cref="ErrorKind"/>; a <see cref="JsonException"/> becomes <see cref="ErrorKind.BadRequest"/>;
 /// anything else is <see cref="ErrorKind.System"/> (500) and is logged with context.
 /// </summary>
-public sealed class ApiExceptionHandler(IRequestContext requestContext) : IExceptionHandler
+/// <remarks>
+/// ASP.NET resolves <see cref="IExceptionHandler"/> as a singleton (via <c>AddExceptionHandler&lt;T&gt;</c>),
+/// so the per-request <see cref="IRequestContext"/> must not be constructor-injected — it is resolved from
+/// <see cref="HttpContext.RequestServices"/> at handle-time instead.
+/// </remarks>
+public sealed class ApiExceptionHandler : IExceptionHandler
 {
     private static readonly ILogger Logger = Log.ForContext<ApiExceptionHandler>();
 
@@ -28,6 +34,8 @@ public sealed class ApiExceptionHandler(IRequestContext requestContext) : IExcep
         else
             Logger.Debug(exception, "Handled {Kind} for {Path}", kind, httpContext.Request.Path.Value);
 
+        var correlationId = httpContext.RequestServices.GetService<IRequestContext>()?.CorrelationId ?? string.Empty;
+
         var problem = new ProblemDetail
         {
             Type = kind.ToString(),
@@ -35,7 +43,7 @@ public sealed class ApiExceptionHandler(IRequestContext requestContext) : IExcep
             Detail = explanation,
             StatusCode = status,
             Instance = httpContext.Request.Path.Value ?? string.Empty,
-            CorrelationId = requestContext.CorrelationId ?? string.Empty,
+            CorrelationId = correlationId,
             Segments = [.. details],
         };
 
