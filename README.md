@@ -22,6 +22,7 @@
   <a href="https://www.nuget.org/packages/Pondhawk.Rules.EFCore"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules.EFCore?label=Rules.EFCore" alt="Pondhawk.Rules.EFCore" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Rql"><img src="https://img.shields.io/nuget/v/Pondhawk.Rql?label=Rql" alt="Pondhawk.Rql" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Hosting"><img src="https://img.shields.io/nuget/v/Pondhawk.Hosting?label=Hosting" alt="Pondhawk.Hosting" /></a>
+  <a href="https://www.nuget.org/packages/Pondhawk.Api"><img src="https://img.shields.io/nuget/v/Pondhawk.Api?label=Api" alt="Pondhawk.Api" /></a>
 </p>
 
 ---
@@ -39,6 +40,7 @@ Pondhawk Tools is a collection of class libraries built by [Pond Hawk Technologi
 | [**Pondhawk.Logging**](src/Pondhawk.Logging/README.md) | Serilog-based structured logging API (method tracing, object/payload logging, `[Sensitive]` masking) + the `ILoggerSource` acquisition abstraction |
 | [**Pondhawk.Logging.Watch**](src/Pondhawk.Logging.Watch/README.md) | Watch Server provider for Pondhawk.Logging — Serilog sink with Channel-based batching, dynamic switching, and a switch-aware `ILoggerSource` |
 | [**Pondhawk.Hosting**](src/Pondhawk.Hosting/README.md) | `AddSingletonWithStart<T>()` pattern for co-locating service registration with startup logic |
+| [**Pondhawk.Api**](src/Pondhawk.Api/README.md) | ASP.NET Core web kit — endpoint modules, `Response<T>`→ProblemDetails filter, gateway identity, diagnostics middleware, and JSON conventions |
 
 ## Getting Started
 
@@ -55,6 +57,7 @@ dotnet add package Pondhawk.Rules
 dotnet add package Pondhawk.Rql
 dotnet add package Pondhawk.Logging
 dotnet add package Pondhawk.Logging.Watch
+dotnet add package Pondhawk.Api
 ```
 
 Pre-release builds are available on [GitHub Packages](https://github.com/orgs/pondhawk/packages). Add the feed to your NuGet configuration:
@@ -469,6 +472,58 @@ services.AddSingletonWithStart<CacheService>(
 
 Also includes `AppLifecycleService`, an `IHostedService` that signals lifecycle state through flag files (`started.flag` / `stopped.flag`) and watches for an external `muststop.flag` to trigger a graceful shutdown.
 
+### Pondhawk.Api
+
+An ASP.NET Core web kit built on Pondhawk.Core, Pondhawk.Logging, and Pondhawk.Rules. Endpoints are grouped into `IEndpointModule`s that dispatch to the mediator; handlers return a `Response<T>` envelope and stay transport-agnostic, while `ResponseEndpointFilter` renders it to `Ok`/JSON on success or a ProblemDetails (`application/problem+json`) on failure — with the `ErrorKind` mapped to the right HTTP status.
+
+```csharp
+using Pondhawk.Api.Endpoints;
+using Pondhawk.Api.Filters;
+using Pondhawk.Mediator;
+
+public sealed class OrderModule(IMediator mediator) : IEndpointModule
+{
+    public string BasePath => "/orders";
+
+    public void Configure(RouteGroupBuilder group) =>
+        group.AddEndpointFilter<ResponseEndpointFilter>();   // Response<T> -> Ok/JSON or ProblemDetails
+
+    public void AddRoutes(IEndpointRouteBuilder app) =>
+        // handler returns Response<Order>; the filter renders it
+        app.MapGet("/{id:int}", (int id) => mediator.SendAsync(new GetOrder(id)));
+}
+```
+
+Wire it up in `Program.cs`:
+
+```csharp
+using Pondhawk.Api;
+using Pondhawk.Api.Endpoints;
+using Pondhawk.Api.Identity;
+using Pondhawk.Api.Json;
+using Pondhawk.Api.Middleware;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddPondhawkApi();                                    // IHttpContextAccessor + scoped IRequestContext
+builder.Services.AddPondhawkJson();                                  // compact resolver + Pascal naming
+builder.Services.AddGatewayTokenAuthentication(config["GatewaySigningKey"]!); // HS256 X-Gateway-Identity-Token
+builder.Services.AddMediator(typeof(OrderModule).Assembly);          // Pondhawk.Core mediator
+builder.Services.AddEndpointModules(typeof(OrderModule).Assembly);   // discover IEndpointModules
+
+var app = builder.Build();
+
+app.UseDiagnosticsMonitor();      // register EARLY: whole-pipeline begin/end + elapsed
+app.UseAuthentication();
+app.UseDiagnosticsEnrichment();   // after auth: populate IRequestContext (correlation/caller/token)
+app.UseRequestLogging();          // deep: full request dump when diagnostics is debug-enabled
+
+app.MapEndpointModules("/api");   // maps each module's group under /api
+app.Run();
+```
+
+Gateway authentication is inbound-only: one scheme (`IdentityConstants.Scheme`) with two handlers — token mode (signed HS256 JWT) or header mode (`AddGatewayHeaderAuthentication()`, unsigned JSON claim set). See the [package README](src/Pondhawk.Api/README.md) for the full concern list.
+
 ---
 
 ## Dependency Graph
@@ -485,6 +540,9 @@ Pondhawk.Rules.EFCore ──> Pondhawk.Rules
 
 Pondhawk.Rql               (standalone)
 Pondhawk.Hosting           (standalone)
+
+Pondhawk.Api ──> Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules
+    (ASP.NET web kit — endpoint modules, Response<T> -> ProblemDetails, gateway identity, diagnostics)
 ```
 
 ## Building & Testing
