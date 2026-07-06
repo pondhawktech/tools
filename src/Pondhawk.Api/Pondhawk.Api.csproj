@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Title>Pondhawk Api</Title>
+    <Description>ASP.NET Core integration for Pondhawk Tools: endpoint modules, Response&lt;T&gt; to ProblemDetails mapping, gateway identity, diagnostics middleware, exception handling, and JSON conventions. Built on Pondhawk.Core and Pondhawk.Logging.</Description>
+    <Authors>Pond Hawk Technologies Inc.</Authors>
+    <Company>Pond Hawk Technologies Inc.</Company>
+    <Copyright>Pond Hawk Technologies Inc. (c) 2026</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/pondhawk/tools</RepositoryUrl>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pondhawk.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pondhawk.Core\Pondhawk.Core.csproj" />
+    <ProjectReference Include="..\Pondhawk.Logging\Pondhawk.Logging.csproj" />
+    <ProjectReference Include="..\Pondhawk.Rules\Pondhawk.Rules.csproj" />
+  </ItemGroup>
+
+</Project>
