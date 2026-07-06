@@ -10,7 +10,8 @@ dotnet build pondhawk-tools.slnx
 
 # Build a specific project
 dotnet build src/Pondhawk.Core/Pondhawk.Core.csproj
-dotnet build src/Pondhawk.Watch/Pondhawk.Watch.csproj
+dotnet build src/Pondhawk.Logging/Pondhawk.Logging.csproj
+dotnet build src/Pondhawk.Logging.Watch/Pondhawk.Logging.Watch.csproj
 dotnet build src/Pondhawk.Rules/Pondhawk.Rules.csproj
 dotnet build src/Pondhawk.Rql/Pondhawk.Rql.csproj
 dotnet build src/Pondhawk.Hosting/Pondhawk.Hosting.csproj
@@ -47,21 +48,27 @@ Core utilities, pipeline infrastructure, mediator, and common exception types. K
 - **Utilities**: Pipeline infrastructure (`IServiceCollection`-based DI registration), type extensions, date/time helpers.
 - **Exceptions**: Common exception types.
 
-### Pondhawk.Watch — Serilog Sink + Logging API (standalone)
+### Pondhawk.Logging — Structured Logging API + `ILoggerSource` (standalone)
 
-A Serilog `ILogEventSink` with Channel-based batching, plus the full Watch logging API. Fully standalone — no dependency on Pondhawk.Core. Targets `net10.0` (single target — no conditional compilation).
+The Serilog-based logging API and the logger-acquisition abstraction. No sink, no transport — provider packages (e.g. Pondhawk.Logging.Watch) build on it. Fully standalone — no dependency on Pondhawk.Core. Targets `net10.0`.
 
-- **Logging API** (`Pondhawk.Watch` namespace): `SerilogExtensions` provides extensions on both `Serilog.ILogger` and `object`:
-  - **`object.GetLogger()`** — returns a `Serilog.ILogger` with `SourceContext` set to the concise full name of the object's type
-  - **`object.EnterMethod()`** / **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time
+- **Logging API** (`Pondhawk.Logging` namespace): `SerilogExtensions` provides extensions on `Serilog.ILogger`. Obtain a logger via an `ILoggerSource` (below) or the standard Serilog way (`Log.ForContext<T>()`), then call:
+  - **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time
   - **`ILogger.Inspect(name, value)`** — logs a name/value pair as `"{Name} = {Value}"` at Debug level
-  - **`ILogger.LogObject(value)`** — serializes an object to JSON payload
+  - **`ILogger.LogObject(value)`** — serializes an object to a JSON payload
   - **`ILogger.LogJson/LogSql/LogXml/LogYaml/LogText(title, content)`** — typed payload logging with syntax highlighting hints
-  - Also: `WatchSwitchConfig`, `WatchPropertyNames`, serializers (`JsonObjectSerializer`), `PayloadType` enum, `[Sensitive]` attribute, `CorrelationManager`.
-- **WatchSink**: `ILogEventSink` implementation with unbounded Channel batching. Converts Serilog events to Watch `LogEvent` instances with switch-based filtering. Circuit breaker for HTTP resilience.
-- **WatchSinkExtensions**: Serilog configuration extensions. **`UseWatch(serverUrl, domain)`** is the primary API — sets `MinimumLevel.Verbose()` and adds the Watch sink so the Watch Server controls filtering via switches. `WriteTo.Watch()` is the lower-level alternative for manual minimum-level control.
-- **Switching**: Dynamic log level control via `SwitchSource`/`SwitchDef` with pattern matching. `WatchSwitchSource` polls a Watch Server for switch configuration.
-- **LogEvent/LogEventBatch**: Event model serialized as MemoryPack+Brotli for the wire; System.Text.Json (source-generated via `LogEventBatchContext`) is available for debugging/testing.
+  - Also: `LogPropertyNames` (public, neutralized `Pondhawk.*` property-name contract shared with sinks), serializers (`JsonObjectSerializer`), `PayloadType` enum, `[Sensitive]` attribute, `CorrelationManager`, `TypeExtensions` (concise type names).
+- **`ILoggerSource`**: the single seam an app injects to obtain category-scoped loggers — `CreateLogger<T>()` / `CreateLogger(Type)` / `CreateLogger(string)`, all returning `Serilog.ILogger`. `SerilogLoggerSource` is the canonical-Serilog default (`root.ForContext(SourceContext, category)`). A provider supplies a smarter one; an app can implement its own and drop the Watch package entirely with handlers unchanged. (Named `CreateLogger`, not `For`, to avoid analyzer rule CA1716.)
+
+### Pondhawk.Logging.Watch — Watch Server provider (references Pondhawk.Logging)
+
+A Serilog `ILogEventSink` with Channel-based batching, dynamic switch-based level control, and a switch-aware `ILoggerSource`. Targets `net10.0`.
+
+- **WatchSink**: `ILogEventSink` with unbounded Channel batching. Converts Serilog events to Watch `LogEvent` instances with per-event switch-based filtering (`SwitchSource.Lookup`). Circuit breaker for HTTP resilience.
+- **WatchSinkExtensions**: Serilog config extensions. **`UseWatch(serverUrl, domain)`** is the primary API — sets `MinimumLevel.Verbose()` and adds the sink so the Watch Server controls filtering via switches. `WriteTo.Watch()` is the lower-level alternative. Out-param overloads (`UseWatch(..., out SwitchSource)`, `Watch(..., out SwitchSource)`) expose the switch source so the root can share one instance with a `WatchLoggerSource`.
+- **WatchLogger / WatchLoggerSource**: `WatchLogger` is an internal `ILogger` whose `IsEnabled` consults the live switch table for its category; because the logging API gates on `IsEnabled` (a real, virtually-dispatched interface member), the whole API becomes switch-aware — payloads are not serialized for switch-dropped categories — while callers hold a plain `ILogger`. `WatchLoggerSource` (public `ILoggerSource`) hands these out, sharing one `SwitchSource` with the sink.
+- **Switching**: Dynamic log level control via `SwitchSource`/`SwitchDef` with pattern matching (longest prefix wins). `WatchSwitchSource` polls a Watch Server for switch configuration.
+- **LogEvent/LogEventBatch**: Event model serialized as MemoryPack+Brotli for the wire; System.Text.Json (source-generated via `LogEventBatchContext`) available for debugging/testing.
 
 ### Pondhawk.Rules — Rule Engine (standalone, no Core dependency)
 
@@ -119,8 +126,9 @@ Lightweight service lifecycle management for `Microsoft.Extensions.Hosting`. Sta
 ### Dependency Graph
 
 ```
-Pondhawk.Core     (foundation — mediator, pipeline infrastructure, utilities, exceptions)
-Pondhawk.Watch    (standalone — logging API, Serilog sink, net10.0)
+Pondhawk.Core          (foundation — mediator, pipeline infrastructure, utilities, exceptions)
+Pondhawk.Logging       (standalone — logging API + ILoggerSource, net10.0)
+Pondhawk.Logging.Watch ──→ Pondhawk.Logging   (Watch sink + switching + switch-aware source)
 Pondhawk.Rules    (standalone)
 Pondhawk.Rules.EFCore ──→ Pondhawk.Rules
 Pondhawk.Rql      (standalone)
@@ -129,7 +137,7 @@ Pondhawk.Hosting  (standalone)
 
 ## Related Repository
 
-**[pondhawk/watch-server](https://github.com/pondhawk/watch-server)** (`E:\repository\watch-server`) — The Pondhawk Watch Server, a log event aggregation server with ASP.NET Core Web API, SQLite storage, React UI, and Winston transport for Node.js. Consumes the `Pondhawk.Watch` NuGet package from this repo as its client-side logging sink.
+**[pondhawk/watch-server](https://github.com/pondhawk/watch-server)** (`E:\repository\watch-server`) — The Pondhawk Watch Server, a log event aggregation server with ASP.NET Core Web API, SQLite storage, React UI, and Winston transport for Node.js. Consumes the `Pondhawk.Logging.Watch` NuGet package from this repo as its client-side logging sink.
 
 ## Conventions
 

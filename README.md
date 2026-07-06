@@ -16,7 +16,8 @@
 
 <p align="center">
   <a href="https://www.nuget.org/packages/Pondhawk.Core"><img src="https://img.shields.io/nuget/v/Pondhawk.Core?label=Core" alt="Pondhawk.Core" /></a>
-  <a href="https://www.nuget.org/packages/Pondhawk.Watch"><img src="https://img.shields.io/nuget/v/Pondhawk.Watch?label=Watch" alt="Pondhawk.Watch" /></a>
+  <a href="https://www.nuget.org/packages/Pondhawk.Logging"><img src="https://img.shields.io/nuget/v/Pondhawk.Logging?label=Logging" alt="Pondhawk.Logging" /></a>
+  <a href="https://www.nuget.org/packages/Pondhawk.Logging.Watch"><img src="https://img.shields.io/nuget/v/Pondhawk.Logging.Watch?label=Logging.Watch" alt="Pondhawk.Logging.Watch" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Rules"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules?label=Rules" alt="Pondhawk.Rules" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Rules.EFCore"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules.EFCore?label=Rules.EFCore" alt="Pondhawk.Rules.EFCore" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Rql"><img src="https://img.shields.io/nuget/v/Pondhawk.Rql?label=Rql" alt="Pondhawk.Rql" /></a>
@@ -35,7 +36,8 @@ Pondhawk Tools is a collection of class libraries built by [Pond Hawk Technologi
 | [**Pondhawk.Rules.EFCore**](src/Pondhawk.Rules.EFCore/README.md) | EF Core `SaveChangesInterceptor` that validates entities through Rules before save |
 | [**Pondhawk.Rql**](src/Pondhawk.Rql/README.md) | Resource Query Language — filtering DSL with fluent builder, parser, and SQL/LINQ serialization |
 | [**Pondhawk.Core**](src/Pondhawk.Core/README.md) | Shared foundation — mediator, configuration modules, pipeline infrastructure, utilities, exceptions |
-| [**Pondhawk.Watch**](src/Pondhawk.Watch/README.md) | Serilog logging API + sink with Channel-based batching and circuit-breaker resilience |
+| [**Pondhawk.Logging**](src/Pondhawk.Logging/README.md) | Serilog-based structured logging API (method tracing, object/payload logging, `[Sensitive]` masking) + the `ILoggerSource` acquisition abstraction |
+| [**Pondhawk.Logging.Watch**](src/Pondhawk.Logging.Watch/README.md) | Watch Server provider for Pondhawk.Logging — Serilog sink with Channel-based batching, dynamic switching, and a switch-aware `ILoggerSource` |
 | [**Pondhawk.Hosting**](src/Pondhawk.Hosting/README.md) | `AddSingletonWithStart<T>()` pattern for co-locating service registration with startup logic |
 
 ## Getting Started
@@ -51,7 +53,8 @@ Stable releases are published to [nuget.org](https://www.nuget.org/profiles/pond
 ```bash
 dotnet add package Pondhawk.Rules
 dotnet add package Pondhawk.Rql
-dotnet add package Pondhawk.Watch
+dotnet add package Pondhawk.Logging
+dotnet add package Pondhawk.Logging.Watch
 ```
 
 Pre-release builds are available on [GitHub Packages](https://github.com/orgs/pondhawk/packages). Add the feed to your NuGet configuration:
@@ -411,27 +414,46 @@ services.AddPipeline<OrderContext>(steps => steps
     .Add<SaveStep>());
 ```
 
-### Pondhawk.Watch
+### Pondhawk.Logging
 
-Serilog logging API + `ILogEventSink` with unbounded `Channel<T>` batching and circuit-breaker resilience. Provides `GetLogger()` on any object, disposable method tracing, typed payload logging, and the Watch sink.
+Serilog-based structured logging API — method tracing, object/typed-payload logging, `[Sensitive]` masking — plus the `ILoggerSource` acquisition abstraction. No sink; provider packages build on it.
 
 ```csharp
-using Pondhawk.Watch;
+using Pondhawk.Logging;
 using Serilog;
 
-// Configure Serilog — Watch Server controls log levels via switches
+public class OrderService
+{
+    private readonly ILogger _log;
+
+    // Inject ILoggerSource; CreateLogger<T>() sets SourceContext to the type name.
+    public OrderService(ILoggerSource loggers) => _log = loggers.CreateLogger<OrderService>();
+
+    public void Process(int orderId, Order order, string sqlText)
+    {
+        using var _ = _log.EnterMethod();
+        _log.Inspect("orderId", orderId);   // logs "orderId = 123" at Debug
+        _log.LogObject("payload", order);   // serializes object to JSON
+        _log.LogSql("query", sqlText);      // typed payload with syntax hint
+    }
+}
+```
+
+### Pondhawk.Logging.Watch
+
+Watch Server provider for Pondhawk.Logging — a Serilog `ILogEventSink` with unbounded `Channel<T>` batching, circuit-breaker resilience, dynamic switch-based level control, and a switch-aware `ILoggerSource` (`WatchLoggerSource`) that skips payload serialization for switch-dropped categories.
+
+```csharp
+using Pondhawk.Logging;
+using Pondhawk.Logging.Watch;
+using Serilog;
+
+// Watch Server controls log levels via switches; share the switch source with a WatchLoggerSource.
 Log.Logger = new LoggerConfiguration()
-    .UseWatch("http://localhost:11000", "MyApp")
+    .UseWatch("http://localhost:11000", "MyApp", out var switchSource)
     .CreateLogger();
 
-// Logging API
-var log = this.GetLogger();
-using (log.EnterMethod())
-{
-    log.Inspect("orderId", orderId);        // logs "orderId = 123" at Debug
-    log.LogObject("payload", order);        // serializes object to JSON
-    log.LogSql("query", sqlText);           // typed payload with syntax hint
-}
+ILoggerSource loggers = new WatchLoggerSource(Log.Logger, switchSource);
 ```
 
 ### Pondhawk.Hosting
@@ -453,7 +475,8 @@ Also includes `AppLifecycleService`, an `IHostedService` that signals lifecycle 
 
 ```
 Pondhawk.Core              (foundation — mediator, configuration, pipeline, utilities, exceptions)
-Pondhawk.Watch             (standalone — logging API, Serilog sink)
+Pondhawk.Logging           (standalone — logging API + ILoggerSource)
+Pondhawk.Logging.Watch     (→ Pondhawk.Logging — Watch sink + switching + switch-aware source)
 
 Pondhawk.Rules             (standalone)
     ^
