@@ -37,6 +37,18 @@ public class AuthenticationHandlerTests
         return handler;
     }
 
+    private static async Task<GatewayDevelopmentAuthenticationHandler> CreateDevHandler(HttpContext http, ClaimSet identity)
+    {
+        var handler = new GatewayDevelopmentAuthenticationHandler(
+            new TestOptionsMonitor<GatewayDevelopmentAuthenticationSchemeOptions>(
+                new GatewayDevelopmentAuthenticationSchemeOptions { Identity = identity }),
+            NullLoggerFactory.Instance,
+            UrlEncoder.Default);
+
+        await handler.InitializeAsync(SchemeFor(typeof(GatewayDevelopmentAuthenticationHandler)), http);
+        return handler;
+    }
+
     // ---- Token handler ----
 
     [Fact]
@@ -155,5 +167,43 @@ public class AuthenticationHandlerTests
         var result = await handler.AuthenticateAsync();
 
         result.None.ShouldBeTrue();
+    }
+
+    // ---- Development handler ----
+
+    [Fact]
+    public async Task Development_AuthenticatesAsConfiguredIdentity_WithNoGatewayHeaders()
+    {
+        // No X-Gateway-* headers at all — dev mode still yields the configured user.
+        var http = new DefaultHttpContext();
+        var handler = await CreateDevHandler(http, TestKeys.SampleClaimSet());
+
+        var result = await handler.AuthenticateAsync();
+
+        result.Succeeded.ShouldBeTrue();
+        result.Principal.FindFirst(IdentityConstants.SubjectClaim).Value.ShouldBe("u-123");
+        result.Principal.IsInRole("admin").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Development_ProjectsAllConfiguredClaims()
+    {
+        var identity = new ClaimSet
+        {
+            UserId = "dev-1",
+            UserName = "Dev User",
+            Email = "dev@local",
+            Roles = { "admin", "user" },
+        };
+        var http = new DefaultHttpContext();
+        var handler = await CreateDevHandler(http, identity);
+
+        var result = await handler.AuthenticateAsync();
+
+        result.Succeeded.ShouldBeTrue();
+        result.Principal.FindFirst(IdentityConstants.SubjectClaim).Value.ShouldBe("dev-1");
+        result.Principal.FindFirst(IdentityConstants.UserNameClaim).Value.ShouldBe("Dev User");
+        result.Principal.FindFirst(IdentityConstants.EmailClaim).Value.ShouldBe("dev@local");
+        result.Principal.IsInRole("user").ShouldBeTrue();
     }
 }

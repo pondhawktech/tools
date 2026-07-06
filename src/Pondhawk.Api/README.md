@@ -55,14 +55,17 @@ The response filter and the exception handler share one mapping:
 
 ### Gateway identity (inbound only)
 
-One authentication scheme (`IdentityConstants.Scheme`) with two inbound handlers:
+One authentication scheme (`IdentityConstants.Scheme`) with three handlers (register exactly one):
 
 - **Token mode** — `AddGatewayTokenAuthentication(base64Key)` validates an HS256 JWT in the
   `X-Gateway-Identity-Token` header via `Microsoft.IdentityModel.JsonWebTokens`.
 - **Header mode** — `AddGatewayHeaderAuthentication()` reads an unsigned JSON claim set from the
   `X-Gateway-Identity` header.
+- **Development mode** — `AddGatewayDevelopmentAuthentication(ClaimSet)` authenticates every request as a
+  fixed configured identity, with no gateway and no token, so authenticated code paths can be exercised
+  locally. **Local development only** — never register it in a deployed configuration.
 
-Both project a minimal `ClaimSet` (UserId, UserName, FirstName, LastName, Email, Roles) mapped to/from a
+All three project a minimal `ClaimSet` (UserId, UserName, FirstName, LastName, Email, Roles) mapped to/from a
 `ClaimsPrincipal` by `ClaimSetPrincipal`; `IGatewayTokenEncoder`/`GatewayTokenJwtEncoder` mint HS256
 tokens. This package handles inbound authentication only — outbound/client token propagation is
 deliberately out of scope.

@@ -121,17 +121,23 @@ A failure `ProblemDetail` carries `Type` (the kind), `Title` (error code), `Deta
 
 ---
 
-## Gateway Auth Model — one scheme, two modes (inbound only)
+## Gateway Auth Model — one scheme, three modes (inbound only)
 
-There is **one authentication scheme** (`IdentityConstants.Scheme`) with **two inbound handlers**:
+There is **one authentication scheme** (`IdentityConstants.Scheme`) with **three handlers** (register exactly one):
 
 - **Token mode** — `AddGatewayTokenAuthentication(signingKeyBase64)` registers a `GatewayTokenJwtEncoder`
   from the base64 HS256 key and the `GatewayTokenAuthenticationHandler`, which validates an HS256 JWT in
   the **`X-Gateway-Identity-Token`** header via `Microsoft.IdentityModel.JsonWebTokens`.
 - **Header mode** — `AddGatewayHeaderAuthentication()` registers the `GatewayHeaderAuthenticationHandler`,
   which reads an **unsigned** JSON claim set from the **`X-Gateway-Identity`** header. No signing key.
+- **Development mode** — `AddGatewayDevelopmentAuthentication(ClaimSet)` registers the
+  `GatewayDevelopmentAuthenticationHandler`, which authenticates **every** request as a fixed configured
+  identity, with no gateway and no token. Its sole purpose is to exercise an app's authenticated code
+  paths (a "current user" endpoint, role-gated routes) **locally, off the gateway**. **Local development
+  only** — it authenticates unconditionally, so never register it in a deployed configuration. (Behind the
+  gateway use token/header mode; a standalone deployment that needs no user simply leaves auth off.)
 
-Both project a minimal **`ClaimSet`** (UserId, UserName, FirstName, LastName, Email, Roles), mapped
+All three project a minimal **`ClaimSet`** (UserId, UserName, FirstName, LastName, Email, Roles), mapped
 to/from a `ClaimsPrincipal` by **`ClaimSetPrincipal`**. **`IGatewayTokenEncoder`** /
 **`GatewayTokenJwtEncoder`** mint HS256 tokens for the token mode.
 
