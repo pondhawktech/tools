@@ -40,8 +40,9 @@ public sealed class ApiExceptionHandler(IRequestContext requestContext) : IExcep
         };
 
         httpContext.Response.StatusCode = status;
-        httpContext.Response.ContentType = "application/problem+json";
-        await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken).ConfigureAwait(false);
+        await httpContext.Response
+            .WriteAsJsonAsync(problem, options: null, contentType: "application/problem+json", cancellationToken)
+            .ConfigureAwait(false);
 
         return true;
     }

@@ -17,6 +17,7 @@
     <Project Path="test/Pondhawk.Hosting.Tests/Pondhawk.Hosting.Tests.csproj" />
     <Project Path="test/Pondhawk.Rql.Tests/Pondhawk.Rql.Tests.csproj" />
     <Project Path="test/Pondhawk.Rules.Tests/Pondhawk.Rules.Tests.csproj" />
+    <Project Path="test/Pondhawk.Api.Tests/Pondhawk.Api.Tests.csproj" />
     <Project Path="test/Pondhawk.Logging.Tests/Pondhawk.Logging.Tests.csproj" />
     <Project Path="test/Pondhawk.Logging.Watch.Tests/Pondhawk.Logging.Watch.Tests.csproj" />
   </Folder>
