@@ -35,4 +35,21 @@ public static class IdentityServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers development-mode gateway auth: every request is authenticated as the given
+    /// <paramref name="identity"/>, with no gateway and no token, so authenticated code paths can be
+    /// exercised locally. FOR LOCAL DEVELOPMENT ONLY — it authenticates unconditionally, so it must
+    /// never be wired in a deployed configuration.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="identity">The identity every request is authenticated as.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddGatewayDevelopmentAuthentication(this IServiceCollection services, ClaimSet identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        services.AddAuthentication(IdentityConstants.Scheme).AddGatewayDevelopment(identity);
+
+        return services;
+    }
 }
