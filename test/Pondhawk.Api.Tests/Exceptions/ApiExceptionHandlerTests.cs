@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Pondhawk.Api.Context;
 using Pondhawk.Api.Exceptions;
 using Pondhawk.Exceptions;
 using Shouldly;
@@ -11,8 +13,14 @@ public class ApiExceptionHandlerTests
 {
     private static async Task<(bool Handled, int Status, string ContentType, string Body)> Handle(Exception ex)
     {
-        var handler = new ApiExceptionHandler(new FakeRequestContext { CorrelationId = "corr-x" });
-        var http = new DefaultHttpContext { Response = { Body = new MemoryStream() } };
+        var handler = new ApiExceptionHandler();
+        var services = new ServiceCollection();
+        services.AddScoped<IRequestContext>(_ => new FakeRequestContext { CorrelationId = "corr-x" });
+        var http = new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider(),
+            Response = { Body = new MemoryStream() },
+        };
         http.Request.Path = "/api/resource";
 
         var handled = await handler.TryHandleAsync(http, ex, CancellationToken.None);
