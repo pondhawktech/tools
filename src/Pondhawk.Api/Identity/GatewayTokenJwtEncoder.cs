@@ -46,6 +46,7 @@ public sealed class GatewayTokenJwtEncoder : IGatewayTokenEncoder
         var result = await Handler.ValidateTokenAsync(token, new TokenValidationParameters
         {
             IssuerSigningKey = _key,
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
             ValidateIssuer = false,
             ValidateAudience = false,
             ValidateLifetime = true,

@@ -9,8 +9,12 @@ namespace Pondhawk.Api.Context;
 /// </summary>
 public interface IRequestContext
 {
-    /// <summary>Gets the correlation id for the current request, if one has been established.</summary>
-    string? CorrelationId { get; }
+    /// <summary>
+    /// Gets or sets the correlation id for the current request. The default implementation owns a
+    /// stable id (generating one if none was supplied), so this is reliably non-null regardless of
+    /// whether an ambient <see cref="System.Diagnostics.Activity"/> exists.
+    /// </summary>
+    string? CorrelationId { get; set; }
 
     /// <summary>Gets or sets the authenticated caller principal for the current request.</summary>
     ClaimsPrincipal? Caller { get; set; }

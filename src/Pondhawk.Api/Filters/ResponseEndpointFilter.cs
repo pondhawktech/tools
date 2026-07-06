@@ -27,7 +27,7 @@ public class ResponseEndpointFilter(IRequestContext requestContext, JsonSerializ
         if (response.Ok)
         {
             if (response.Value is Stream stream)
-                return Results.Stream(stream, "application/json");
+                return Results.Stream(stream); // defaults to application/octet-stream; a raw stream is not assumed JSON
 
             return response.Value is null ? Results.Ok() : Results.Json(response.Value, options);
         }

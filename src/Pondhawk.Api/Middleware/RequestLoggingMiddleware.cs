@@ -14,6 +14,12 @@ namespace Pondhawk.Api.Middleware;
 /// inbound request — method, path, query, redacted headers, and a buffered (rewound) body — as a Watch
 /// text payload, then the response status. A no-op when the category is not debug-enabled.
 /// </summary>
+/// <remarks>
+/// Register this <em>deep</em> in the pipeline (after routing/auth) so it can capture the resolved
+/// endpoint and authenticated user — accepting that anything short-circuited earlier won't reach it.
+/// The early, whole-pipeline bracket + total timing is <see cref="DiagnosticsMonitorMiddleware"/>'s
+/// job; the two are complementary by position, not redundant.
+/// </remarks>
 /// <param name="next">The next middleware.</param>
 public sealed class RequestLoggingMiddleware(RequestDelegate next)
 {

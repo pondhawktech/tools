@@ -26,10 +26,14 @@ public class RequestContextTests
     }
 
     [Fact]
-    public void CorrelationId_NullWhenNoActivity()
+    public void CorrelationId_GeneratesStableId_WhenNoActivity()
     {
         var ctx = NewContext();
-        ctx.CorrelationId.ShouldBeNull();
+
+        var id = ctx.CorrelationId;
+
+        id.ShouldNotBeNullOrWhiteSpace();
+        ctx.CorrelationId.ShouldBe(id); // stable across reads
     }
 
     [Fact]

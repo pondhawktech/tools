@@ -70,7 +70,7 @@ public class ResponseEndpointFilterTests
 
         var (status, contentType, _) = await Execute(result);
         status.ShouldBe(200);
-        contentType.ShouldBe("application/json");
+        contentType.ShouldBe("application/octet-stream");
     }
 
     [Theory]

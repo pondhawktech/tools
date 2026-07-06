@@ -10,6 +10,13 @@ namespace Pondhawk.Api.Middleware;
 /// Brackets each request with begin/end diagnostics and elapsed timing, logged to the
 /// <c>Pondhawk.Diagnostics.Http</c> category via Pondhawk.Logging.
 /// </summary>
+/// <remarks>
+/// Register this <em>early</em> in the pipeline: it is the outer bracket, so it captures the request
+/// at entry, times the whole pipeline, and still logs requests that later middleware short-circuits
+/// (e.g. a 401 from authentication). This is intentionally distinct from
+/// <see cref="RequestLoggingMiddleware"/> (registered deeper for richer post-routing/post-auth detail
+/// at the cost of missing earlier short-circuits) — do not consolidate the two.
+/// </remarks>
 /// <param name="next">The next middleware.</param>
 public sealed class DiagnosticsMonitorMiddleware(RequestDelegate next)
 {
