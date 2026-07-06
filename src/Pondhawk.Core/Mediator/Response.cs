@@ -15,7 +15,7 @@ namespace Pondhawk.Mediator;
 /// </remarks>
 /// <typeparam name="T">The response value type.</typeparam>
 [SuppressMessage("Design", "CA1000:Do not declare static members on generic types", Justification = "Static factory methods are the intended public construction API for the envelope (Result<T>.Ok-style).")]
-public readonly record struct Response<T>
+public readonly record struct Response<T> : IResponse
 {
     /// <summary>
     /// The failure carried by <c>default(Response&lt;T&gt;)</c> and by any failure state whose backing
@@ -50,6 +50,12 @@ public readonly record struct Response<T>
     /// Gets the response value. Meaningful only when <see cref="Ok"/> is <see langword="true"/>.
     /// </summary>
     public T? Value { get; }
+
+    /// <summary>
+    /// Non-generic access to <see cref="Value"/> boxed as <see cref="object"/>, for
+    /// <see cref="IResponse"/> consumers that do not know <typeparamref name="T"/>.
+    /// </summary>
+    object? IResponse.Value => Value;
 
     /// <summary>
     /// Gets the structured error. Non-<see langword="null"/> if and only if <see cref="Ok"/> is

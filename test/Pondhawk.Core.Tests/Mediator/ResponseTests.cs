@@ -219,4 +219,37 @@ public class ResponseTests
         Should.Throw<ArgumentNullException>(() => ok.Match(v => v, null!));
     }
 
+    // ── IResponse (non-generic view) ──
+
+    [Fact]
+    public void IResponse_Success_ExposesBoxedValue()
+    {
+        IResponse r = Response<int>.Success(42);
+
+        r.Ok.ShouldBeTrue();
+        r.Error.ShouldBeNull();
+        r.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public void IResponse_Failure_ExposesError_AndNullValue()
+    {
+        var error = new ErrorInfo { Kind = ErrorKind.NotFound, ErrorCode = "NotFound", Explanation = "gone" };
+
+        IResponse r = Response<string>.Failure(error);
+
+        r.Ok.ShouldBeFalse();
+        r.Error.ShouldBeSameAs(error);
+        r.Value.ShouldBeNull();
+    }
+
+    [Fact]
+    public void IResponse_Default_ReadsAsSystemFailure()
+    {
+        IResponse r = default(Response<int>);
+
+        r.Ok.ShouldBeFalse();
+        r.Error!.Kind.ShouldBe(ErrorKind.System);
+    }
+
 }
