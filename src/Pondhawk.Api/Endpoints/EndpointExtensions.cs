@@ -26,13 +26,28 @@ public static class EndpointExtensions
     public static IServiceCollection AddEndpointModules(this IServiceCollection services, params Assembly[] sources)
     {
         var modules = sources
-            .SelectMany(a => a.GetTypes())
+            .SelectMany(SafeGetTypes)
             .Where(t => !t.IsAbstract && t != typeof(IEndpointModule) && typeof(IEndpointModule).IsAssignableFrom(t));
 
         foreach (var module in modules)
             services.AddSingleton(typeof(IEndpointModule), module);
 
         return services;
+    }
+
+    // Salvage the loadable types when an assembly has an unloadable one (a missing optional
+    // dependency, a version mismatch) — one broken type must not abort discovery. Mirrors the
+    // resilience in Pondhawk.Core's AddMediator.
+    private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            return ex.Types.Where(t => t is not null)!;
+        }
     }
 
     /// <summary>

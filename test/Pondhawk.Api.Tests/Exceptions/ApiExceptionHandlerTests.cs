@@ -74,4 +74,24 @@ public class ApiExceptionHandlerTests
         status.ShouldBe(500);
         body.ShouldContain("kaboom");
     }
+
+    [Fact]
+    public async Task ClientCancellation_IsSwallowedWithoutWriting()
+    {
+        var handler = new ApiExceptionHandler();
+        var http = new DefaultHttpContext
+        {
+            RequestServices = new ServiceCollection().BuildServiceProvider(),
+            Response = { Body = new MemoryStream() },
+            RequestAborted = new CancellationToken(canceled: true),
+        };
+        http.Request.Path = "/api/resource";
+
+        var handled = await handler.TryHandleAsync(http, new OperationCanceledException(), CancellationToken.None);
+
+        // A client disconnect is handled (true) but not turned into a 500, and nothing is written to
+        // the (dead) response.
+        handled.ShouldBeTrue();
+        http.Response.Body.Length.ShouldBe(0);
+    }
 }
