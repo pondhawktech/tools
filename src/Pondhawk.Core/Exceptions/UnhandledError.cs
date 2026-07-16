@@ -1,4 +1,7 @@
-﻿namespace Pondhawk.Exceptions;
+﻿// Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+namespace Pondhawk.Exceptions;
 
 /// <summary>
 /// An error wrapping an unhandled exception with an error code derived from the exception type.

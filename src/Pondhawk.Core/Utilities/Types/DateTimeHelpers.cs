@@ -1,4 +1,7 @@
-﻿namespace Pondhawk.Utilities.Types;
+﻿// Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+namespace Pondhawk.Utilities.Types;
 
 /// <summary>
 /// Provides pre-built date/time range models and methods for calculating date ranges and Unix timestamps.

@@ -1,3 +1,6 @@
+// Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 namespace Pondhawk.Api.Identity;
 
 /// <summary>Encodes/decodes a <see cref="ClaimSet"/> as a signed gateway token (JWT).</summary>

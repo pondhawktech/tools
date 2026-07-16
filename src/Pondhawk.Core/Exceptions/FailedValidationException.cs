@@ -1,4 +1,7 @@
-﻿namespace Pondhawk.Exceptions;
+﻿// Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+namespace Pondhawk.Exceptions;
 
 /// <summary>
 /// Exception thrown when validation produces violation events, carrying the violation details.
