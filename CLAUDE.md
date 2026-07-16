@@ -12,9 +12,7 @@ dotnet build pondhawk-tools.slnx
 dotnet build src/Pondhawk.Core/Pondhawk.Core.csproj
 dotnet build src/Pondhawk.Logging/Pondhawk.Logging.csproj
 dotnet build src/Pondhawk.Logging.Watch/Pondhawk.Logging.Watch.csproj
-dotnet build src/Pondhawk.Rules/Pondhawk.Rules.csproj
 dotnet build src/Pondhawk.Hosting/Pondhawk.Hosting.csproj
-dotnet build src/Pondhawk.Rules.EFCore/Pondhawk.Rules.EFCore.csproj
 dotnet build src/Pondhawk.Api/Pondhawk.Api.csproj
 ```
 
@@ -70,9 +68,9 @@ A Serilog `ILogEventSink` with Channel-based batching, dynamic switch-based leve
 - **Switching**: Dynamic log level control via `SwitchSource`/`SwitchDef` with pattern matching (longest prefix wins). `WatchSwitchSource` polls a Watch Server for switch configuration.
 - **LogEvent/LogEventBatch**: Event model serialized as MemoryPack+Brotli for the wire; System.Text.Json (source-generated via `LogEventBatchContext`) available for debugging/testing.
 
-### Pondhawk.Api — ASP.NET Core web kit (references Pondhawk.Core/Logging/Rules)
+### Pondhawk.Api — ASP.NET Core web kit (references Pondhawk.Core/Logging + the Pondhawk.Rules NuGet package)
 
-The ASP.NET Core web-app kit for Pondhawk Tools (replaces AppCommon.Api). Targets `net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. References Pondhawk.Core (mediator + `Response<T>`/`IResponse`), Pondhawk.Logging (structured logging), and Pondhawk.Rules (validation). Organized by concern:
+The ASP.NET Core web-app kit for Pondhawk Tools (replaces AppCommon.Api). Targets `net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. References Pondhawk.Core (mediator + `Response<T>`/`IResponse`), Pondhawk.Logging (structured logging), and the **Pondhawk.Rules** NuGet package (validation — now an external dependency from [pondhawktech/pondhawk-rules](https://github.com/pondhawktech/pondhawk-rules)). Organized by concern:
 
 - **Context**: `IRequestContext` (`CorrelationId`, `Caller` ClaimsPrincipal, `CallerGatewayToken`). The default `RequestContext` owns a stable correlation id (explicit > ambient `CorrelationManager.Current` > generated). Registered by `AddPondhawkApi()` alongside `IHttpContextAccessor`.
 - **Endpoints**: `IEndpointModule` (`BasePath`, `Configure(RouteGroupBuilder)`, `AddRoutes(IEndpointRouteBuilder)`) — self-contained minimal-API route groups. `AddEndpointModules(assemblies)` discovers and DI-registers modules; `MapEndpointModules(basePath)` maps each module's group. Mapping is resilient — a module that throws is logged and skipped so one bad module cannot break startup.
@@ -85,32 +83,6 @@ The ASP.NET Core web-app kit for Pondhawk Tools (replaces AppCommon.Api). Target
 - **Root**: `AddPondhawkApi()` registers `IHttpContextAccessor` + a scoped `IRequestContext`; the other concerns are opted into by their own extensions.
 
 **ErrorKind → HTTP status** (shared by the response filter and the exception handler): None→200, NotFound→404, NotImplemented→501, Predicate→422, Conflict→409, Concurrency→410, BadRequest→400, AuthenticationRequired→401, NotAuthorized→403, Remote→502, System/Functional/Unknown→500.
-
-### Pondhawk.Rules — Rule Engine (standalone, no Core dependency)
-
-A forward-chaining rule engine with type-based fact matching. Fully standalone — no dependency on Pondhawk.Core. Uses `Microsoft.Extensions.Logging` for listener infrastructure (Serilog picks up MS Logging events transparently). Key subsystems:
-
-- **Builder** (`Pondhawk.Rules.Builder`): Fluent API for defining rules. `RuleBuilder<TFact1..TFact4>` creates `Rule<T>` instances via `When().And().Then()` chains. Supports up to 4 fact types per rule. Multi-fact rules have per-fact `When(Func<T, bool>)`/`And(Func<T, bool>)` overloads that enable C# pattern matching with full type inference. Rules have salience (priority), mutex (mutual exclusion), fire-once, inception/expiration.
-- **Evaluation** (`Pondhawk.Rules.Evaluation`): `EvaluationPlan` generates all fact-type combinations using variations-with-repetition. `TupleEvaluator` executes rules in salience order against fact tuples. `FactSpace` stores facts with int selectors for memory efficiency.
-- **Tree** (`Pondhawk.Rules.Tree`): `RuleTree` indexes rules by fact types for fast lookup with polymorphic type matching.
-- **Validation** (`Pondhawk.Rules.Validators`): `ValidationBuilder<TFact>` with `Assert<T>(expr).Is().IsNot().Otherwise()` chains. Runs at very high salience.
-- **Factory** (`Pondhawk.Rules.Factory`): `RuleSet` for runtime rule creation without predefined builder classes. `RuleSetFactory` uses `Lazy<T>` for thread-safe exactly-once initialization.
-- **Listeners** (`Pondhawk.Rules.Listeners`): Observer pattern (`IEvaluationListener`) for tracing rule evaluation. `WatchEvaluationListener` uses `Microsoft.Extensions.Logging.ILogger`. `WatchEvaluationListenerFactory` uses `ILoggerFactory` (defaults to `NullLoggerFactory`).
-- **RuleEvent**: Sealed event type with `IEquatable<RuleEvent>`, init-only setters, nested `EventCategory` enum (`Info`, `Warning`, `Violation`). Replaces the former Core `EventDetail` dependency.
-- **Exceptions**: `ViolationsExistException`, `NoRulesEvaluatedException`, `EvaluationExhaustedException` — all extend `Exception` directly.
-
-Evaluation flow: `RuleBuilder` → `RuleTree` (indexed by type) → `EvaluationPlan` (generates steps) → `TupleEvaluator` (executes) → `EvaluationResults` (aggregates scores/events/violations). Forward chaining via `InsertFact`/`ModifyFact`/`RetractFact` triggers re-evaluation.
-
-**Authoring guidelines**: Avoid `||` in conditions — each OR branch should be a separate rule for atomicity and traceability. Prefer `.And()` chains over `&&` inside a single predicate.
-
-### Pondhawk.Rules.EFCore — EF Core SaveChanges Validation
-
-Pre-save entity validation interceptor that hooks into EF Core's `SaveChangesInterceptor`. Validates all `Added` and `Modified` entities through `Pondhawk.Rules` before they reach the database.
-
-- **RuleValidationInterceptor**: `SaveChangesInterceptor` subclass that pulls entities from `ChangeTracker`, calls `IRuleSet.Validate()`, and throws `EntityValidationException` if validation fails. Overrides both `SavingChanges` and `SavingChangesAsync`.
-- **EntityValidationException**: Carries `ValidationResult` with structured violations. Formats a human-readable message from violations.
-- **DbContextOptionsBuilderExtensions**: `AddRuleValidation(IRuleSet)` convenience method.
-- Minimum EF Core version: 5.0.0.
 
 ### Pondhawk.Hosting — Service Startup Extensions for Generic Host
 
@@ -132,10 +104,8 @@ Lightweight service lifecycle management for `Microsoft.Extensions.Hosting`. Sta
 Pondhawk.Core          (foundation — mediator, pipeline infrastructure, utilities, exceptions)
 Pondhawk.Logging       (standalone — logging API + ILoggerSource, net10.0)
 Pondhawk.Logging.Watch ──→ Pondhawk.Logging   (Watch sink + switching + switch-aware source)
-Pondhawk.Rules    (standalone)
-Pondhawk.Rules.EFCore ──→ Pondhawk.Rules
 Pondhawk.Hosting  (standalone)
-Pondhawk.Api  ──→ Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules  (ASP.NET web kit — endpoint modules, Response<T>→ProblemDetails, gateway identity, diagnostics)
+Pondhawk.Api  ──→ Pondhawk.Core, Pondhawk.Logging (+ external Pondhawk.Rules NuGet package)  (ASP.NET web kit — endpoint modules, Response<T>→ProblemDetails, gateway identity, diagnostics)
 ```
 
 ## Related Repository
@@ -144,8 +114,10 @@ Pondhawk.Api  ──→ Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules  (ASP.NE
 
 **[pondhawktech/pondhawk-rql](https://github.com/pondhawktech/pondhawk-rql)** — The Resource Query Language (RQL) implementation, extracted from this repo into its own standalone repository and published to NuGet.org as `Pondhawk.Rql`. It had no internal dependents in this solution.
 
+**[pondhawktech/pondhawk-rules](https://github.com/pondhawktech/pondhawk-rules)** — The rule engine (`Pondhawk.Rules`) and its EF Core SaveChanges adapter (`Pondhawk.Rules.EFCore`), extracted from this repo and published to NuGet.org. `Pondhawk.Api` consumes `Pondhawk.Rules` from this package.
+
 ## Conventions
 
-- Namespaces match project/folder structure: `Pondhawk.Mediator`, `Pondhawk.Configuration`, `Pondhawk.Rules`, `Pondhawk.Rules.Builder`, `Pondhawk.Rules.Evaluation`, `Pondhawk.Hosting`
+- Namespaces match project/folder structure: `Pondhawk.Mediator`, `Pondhawk.Configuration`, `Pondhawk.Hosting`
 - Exception: `Pondhawk.Core` project uses `RootNamespace=Pondhawk`
-- `LangVersion` varies: `default` in Rules and Hosting, `latest` in Watch
+- `LangVersion` varies: `default` in Hosting, `latest` in Watch

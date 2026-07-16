@@ -18,8 +18,6 @@
   <a href="https://www.nuget.org/packages/Pondhawk.Core"><img src="https://img.shields.io/nuget/v/Pondhawk.Core?label=Core" alt="Pondhawk.Core" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Logging"><img src="https://img.shields.io/nuget/v/Pondhawk.Logging?label=Logging" alt="Pondhawk.Logging" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Logging.Watch"><img src="https://img.shields.io/nuget/v/Pondhawk.Logging.Watch?label=Logging.Watch" alt="Pondhawk.Logging.Watch" /></a>
-  <a href="https://www.nuget.org/packages/Pondhawk.Rules"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules?label=Rules" alt="Pondhawk.Rules" /></a>
-  <a href="https://www.nuget.org/packages/Pondhawk.Rules.EFCore"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules.EFCore?label=Rules.EFCore" alt="Pondhawk.Rules.EFCore" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Hosting"><img src="https://img.shields.io/nuget/v/Pondhawk.Hosting?label=Hosting" alt="Pondhawk.Hosting" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Api"><img src="https://img.shields.io/nuget/v/Pondhawk.Api?label=Api" alt="Pondhawk.Api" /></a>
 </p>
@@ -32,8 +30,6 @@ Pondhawk Tools is a collection of class libraries built by [Pond Hawk Technologi
 
 | Package | Description |
 |---------|-------------|
-| [**Pondhawk.Rules**](src/Pondhawk.Rules/README.md) | Forward-chaining rule engine with type-based fact matching, scoring, and validation |
-| [**Pondhawk.Rules.EFCore**](src/Pondhawk.Rules.EFCore/README.md) | EF Core `SaveChangesInterceptor` that validates entities through Rules before save |
 | [**Pondhawk.Core**](src/Pondhawk.Core/README.md) | Shared foundation — mediator, configuration modules, pipeline infrastructure, utilities, exceptions |
 | [**Pondhawk.Logging**](src/Pondhawk.Logging/README.md) | Serilog-based structured logging API (method tracing, object/payload logging, `[Sensitive]` masking) + the `ILoggerSource` acquisition abstraction |
 | [**Pondhawk.Logging.Watch**](src/Pondhawk.Logging.Watch/README.md) | Watch Server provider for Pondhawk.Logging — Serilog sink with Channel-based batching, dynamic switching, and a switch-aware `ILoggerSource` |
@@ -51,7 +47,6 @@ Pondhawk Tools is a collection of class libraries built by [Pond Hawk Technologi
 Stable releases are published to [nuget.org](https://www.nuget.org/profiles/pondhawk). Install the packages you need:
 
 ```bash
-dotnet add package Pondhawk.Rules
 dotnet add package Pondhawk.Logging
 dotnet add package Pondhawk.Logging.Watch
 dotnet add package Pondhawk.Api
@@ -70,189 +65,6 @@ Pre-release builds are available on [GitHub Packages](https://github.com/orgs/po
 ```bash
 dotnet build pondhawk-tools.slnx
 dotnet test pondhawk-tools.slnx
-```
-
----
-
-## Pondhawk.Rules
-
-A forward-chaining rule engine with fluent rule definition, multi-fact matching, validation, and decision scoring.
-
-### Defining Rules
-
-Rules are created with a `RuleSet` using the fluent `When()` / `And()` / `Then()` API:
-
-```csharp
-var rules = new RuleSet();
-
-rules.AddRule<Order>("HighValueOrder")
-    .When(o => o.Total > 1000)
-    .Then("Pricing", "Order {Total} exceeds high-value threshold", o => o.Total);
-
-rules.AddRule<Order>("DiscountEligible")
-    .When(o => o.Total > 500)
-    .And(o => o.Customer.IsLoyaltyMember)
-    .Then(o => o.DiscountPct = 0.10m);
-
-rules.Build();
-```
-
-### Multi-Fact Rules
-
-Rules can match across 2, 3, or 4 fact types simultaneously:
-
-```csharp
-rules.AddRule<Order, Customer>("LoyaltyBonus")
-    .When((order, customer) => order.Total > 200 && customer.Tier == "Gold")
-    .Then((order, customer) => order.DiscountPct += 0.05m);
-```
-
-Per-fact overloads let you write conditions against a single fact type, which enables C# pattern matching with full type inference:
-
-```csharp
-rules.AddRule<Order, Customer>("GoldCustomer")
-    .When((Func<Customer, bool>)(c => c.Tier is "Gold" or "Platinum"))
-    .And((Func<Order, bool>)(o => o.Total is > 200 and < 10_000))
-    .Then((order, customer) => order.DiscountPct += 0.05m);
-```
-
-### Validation
-
-`ValidationRule<T>` provides property-level assertions with the `Assert<T>().Is().Otherwise()` pattern:
-
-```csharp
-rules.AddValidation<Customer>("CustomerValidation")
-    .Assert<string>(c => c.Name)
-        .IsNot((c, name) => string.IsNullOrWhiteSpace(name))
-        .Otherwise("Customer name is required")
-    .Assert<string>(c => c.Email)
-        .Is((c, email) => email.Contains('@'))
-        .Otherwise("Validation", "{Name} has an invalid email", c => c.Name);
-```
-
-Validation rules run at very high salience by default, ensuring they execute before business rules.
-
-### Scoring
-
-Use `ThenAffirm()` and `ThenVeto()` to build a weighted decision score:
-
-```csharp
-rules.AddRule<Application>("CreditCheck")
-    .When(a => a.CreditScore > 700)
-    .ThenAffirm(10)
-    .OtherwiseVeto(20);
-
-rules.AddRule<Application>("IncomeCheck")
-    .When(a => a.AnnualIncome > 50_000)
-    .ThenAffirm(15);
-
-// After evaluation:
-// results.Score > 0 means approved
-```
-
-### Forward Chaining
-
-Rules can insert, modify, or retract facts to trigger re-evaluation. Use `Cascade()` to pull in related objects:
-
-```csharp
-rules.AddRule<Order>("ApplyLineItems")
-    .When(o => o.LineItems.Any())
-    .Then(o => { /* process order */ })
-    .CascadeAll(o => o.LineItems);
-
-rules.AddRule<LineItem>("FlagBackorder")
-    .When(li => li.Quantity > li.InStock)
-    .Then(li => li.IsBackordered = true)
-    .Modifies(li => li);
-```
-
-### Rule Properties
-
-Fine-tune rule behavior with salience (priority), mutex (mutual exclusion), fire-once, and time windows:
-
-```csharp
-rules.AddRule<Order>("PriorityRule")
-    .WithSalience(900)                            // higher = runs first (default: 500)
-    .InMutex("ShippingMethod")                    // only one rule wins per mutex group
-    .FireOnce()                                   // skip after first match
-    .WithInception(new DateTime(2025, 1, 1))      // active from
-    .WithExpiration(new DateTime(2025, 12, 31))   // active until
-    .When(o => o.IsExpedited)
-    .Then(o => o.ShippingMethod = "Overnight");
-```
-
-### Evaluation
-
-Build an `EvaluationContext`, add facts, and evaluate:
-
-```csharp
-var context = rules.GetEvaluationContext()
-    .WithDescription("Order Processing")
-    .WithMaxEvaluations(1000)
-    .WithMaxDuration(5000);
-
-context.AddFacts(order, customer);
-var results = context.Evaluate();
-
-// Inspect results
-Console.WriteLine($"Score: {results.Score}");
-Console.WriteLine($"Violations: {results.ViolationCount}");
-Console.WriteLine($"Rules fired: {results.TotalFired}");
-
-foreach (var violation in results.GetViolations())
-    Console.WriteLine($"  [{violation.Group}] {violation.Message}");
-```
-
-Or use the convenience extensions:
-
-```csharp
-// Quick evaluation
-var results = rules.Evaluate(order, customer);
-
-// Validation with structured result
-var validation = rules.Validate(order);
-if (!validation.IsValid)
-{
-    foreach (var (group, violations) in validation.ViolationsByGroup)
-        Console.WriteLine($"{group}: {violations.Count} violation(s)");
-}
-```
-
-### RuleSetFactory
-
-For production scenarios, `RuleSetFactory` provides lazy initialization and namespace-scoped rule sets:
-
-```csharp
-var factory = new RuleSetFactory();
-factory.AddSources(new OrderRules(), new CustomerRules());
-factory.Start();
-
-IRuleSet ruleSet = factory.GetRuleSet();
-IRuleSet orderOnly = factory.GetRuleSet("OrderRules");
-```
-
-### EF Core Integration
-
-`Pondhawk.Rules.EFCore` validates all `Added` and `Modified` entities through your rule set before `SaveChanges`:
-
-```csharp
-services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString)
-           .AddRuleValidation(ruleSet));
-```
-
-If validation fails, `EntityValidationException` is thrown with the full `ValidationResult`:
-
-```csharp
-try
-{
-    await dbContext.SaveChangesAsync();
-}
-catch (EntityValidationException ex)
-{
-    foreach (var v in ex.ValidationResult.Violations)
-        Console.WriteLine($"  {v.Message}");
-}
 ```
 
 ---
@@ -340,7 +152,7 @@ Also includes `AppLifecycleService`, an `IHostedService` that signals lifecycle 
 
 ### Pondhawk.Api
 
-An ASP.NET Core web kit built on Pondhawk.Core, Pondhawk.Logging, and Pondhawk.Rules. Endpoints are grouped into `IEndpointModule`s that dispatch to the mediator; handlers return a `Response<T>` envelope and stay transport-agnostic, while `ResponseEndpointFilter` renders it to `Ok`/JSON on success or a ProblemDetails (`application/problem+json`) on failure — with the `ErrorKind` mapped to the right HTTP status.
+An ASP.NET Core web kit built on Pondhawk.Core, Pondhawk.Logging, and the external Pondhawk.Rules NuGet package. Endpoints are grouped into `IEndpointModule`s that dispatch to the mediator; handlers return a `Response<T>` envelope and stay transport-agnostic, while `ResponseEndpointFilter` renders it to `Ok`/JSON on success or a ProblemDetails (`application/problem+json`) on failure — with the `ErrorKind` mapped to the right HTTP status.
 
 ```csharp
 using Pondhawk.Api.Endpoints;
@@ -399,14 +211,9 @@ Pondhawk.Core              (foundation — mediator, configuration, pipeline, ut
 Pondhawk.Logging           (standalone — logging API + ILoggerSource)
 Pondhawk.Logging.Watch     (→ Pondhawk.Logging — Watch sink + switching + switch-aware source)
 
-Pondhawk.Rules             (standalone)
-    ^
-    |
-Pondhawk.Rules.EFCore ──> Pondhawk.Rules
-
 Pondhawk.Hosting           (standalone)
 
-Pondhawk.Api ──> Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules
+Pondhawk.Api ──> Pondhawk.Core, Pondhawk.Logging (+ external Pondhawk.Rules NuGet package)
     (ASP.NET web kit — endpoint modules, Response<T> -> ProblemDetails, gateway identity, diagnostics)
 ```
 
