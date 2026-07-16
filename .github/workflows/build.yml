@@ -34,7 +34,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: dotnet run --project build/Build.csproj -- --target=Push --exclusive
         env:
-          NUGET_SOURCE: https://nuget.pkg.github.com/pondhawk/index.json
+          NUGET_SOURCE: https://nuget.pkg.github.com/pondhawktech/index.json
           NUGET_API_KEY: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
