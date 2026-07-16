@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Pondhawk.Api.Json;
@@ -169,5 +170,34 @@ public class JsonServiceCollectionExtensionsTests
         var options = provider.GetRequiredService<JsonSerializerOptions>();
 
         options.WriteIndented.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AddPondhawkJson_SingletonIsTheSameInstanceAsFrameworkOptions()
+    {
+        var services = new ServiceCollection();
+        services.AddPondhawkJson();
+
+        var provider = services.BuildServiceProvider();
+        var singleton = provider.GetRequiredService<JsonSerializerOptions>();
+        var framework = provider.GetRequiredService<IOptions<MvcJsonOptions>>().Value.SerializerOptions;
+
+        // Single source of truth: the filter's injected options and the framework's minimal-API
+        // options must be the very same object, so nothing can drift between them.
+        singleton.ShouldBeSameAs(framework);
+    }
+
+    [Fact]
+    public void AddPondhawkJson_ConfigureConverter_ReachesFrameworkOptions()
+    {
+        var services = new ServiceCollection();
+        services.AddPondhawkJson(o => o.Converters.Add(new JsonStringEnumConverter()));
+
+        var provider = services.BuildServiceProvider();
+        var framework = provider.GetRequiredService<IOptions<MvcJsonOptions>>().Value.SerializerOptions;
+
+        // A converter added via configure must apply to WriteAsJsonAsync / minimal-API serialization,
+        // not only to the injected singleton (the old partial copy dropped converters).
+        framework.Converters.ShouldContain(c => c is JsonStringEnumConverter);
     }
 }

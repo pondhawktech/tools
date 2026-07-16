@@ -29,6 +29,20 @@ public sealed class ApiExceptionHandler : IExceptionHandler
     /// <inheritdoc />
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        // The client went away: not a server error, and there is nothing to write to.
+        if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
+        {
+            Logger.Debug("Request {Path} canceled by the client", httpContext.Request.Path.Value);
+            return true;
+        }
+
+        // The response has already begun on the wire — we can no longer render a problem detail.
+        if (httpContext.Response.HasStarted)
+        {
+            Logger.Error(exception, "Unhandled exception after the response started for {Path}", httpContext.Request.Path.Value);
+            return false;
+        }
+
         var (kind, errorCode, explanation, details) = Describe(exception);
         var status = ErrorStatusMap.ToStatus(kind);
 
