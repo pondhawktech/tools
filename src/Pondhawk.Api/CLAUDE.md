@@ -11,8 +11,9 @@ diagnostics middleware, an exception handler, and JSON conventions.
 Targets `net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. Builds on
 [`Pondhawk.Core`](../Pondhawk.Core/CLAUDE.md) (mediator + `Response<T>` / the non-generic `IResponse`),
 [`Pondhawk.Logging`](../Pondhawk.Logging/CLAUDE.md) (structured logging), and
-[`Pondhawk.Rules`](../Pondhawk.Rules/README.md) (request validation). Its only third-party
-PackageReference is `Microsoft.IdentityModel.JsonWebTokens`. Namespace root: `Pondhawk.Api`.
+the [`Pondhawk.Rules`](https://github.com/pondhawktech/pondhawk-rules) NuGet package (request validation).
+Its third-party PackageReferences are `Microsoft.IdentityModel.JsonWebTokens` and `Pondhawk.Rules`.
+Namespace root: `Pondhawk.Api`.
 
 The design point: **handlers never touch HTTP.** They return `Response<T>`; the response filter and the
 exception handler are the single seam that turns success/failure into status codes, so the same
