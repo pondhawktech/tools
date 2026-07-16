@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Pondhawk.Logging" />
     <PackageReference Include="Pondhawk.Rules" />
   </ItemGroup>
 
@@ -34,7 +35,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pondhawk.Core\Pondhawk.Core.csproj" />
-    <ProjectReference Include="..\Pondhawk.Logging\Pondhawk.Logging.csproj" />
   </ItemGroup>
 
 </Project>
