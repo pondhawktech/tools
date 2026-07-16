@@ -1,136 +1,92 @@
 # Pondhawk Tools
 
-> A .NET toolkit by Pond Hawk Technologies providing a forward-chaining rule engine, a resource query language (RQL), structured logging, and service lifecycle management.
+> A .NET toolkit by Pond Hawk Technologies. This repository holds the shared foundation (**Pondhawk.Core** — mediator, configuration, utilities), a generic-host lifecycle helper (**Pondhawk.Hosting**), and an ASP.NET Core web kit (**Pondhawk.Api**). The rule engine, resource query language, and structured logging now live in their own repositories (see "Related libraries" below). All packages target net10.0.
 
 ## Packages
 
-### Pondhawk.Rules — Forward-Chaining Rule Engine
+### Pondhawk.Core — Shared Foundation (Mediator, Configuration, Utilities, Exceptions)
 
-A standalone rule engine with type-based fact matching, fluent rule definition, validation, and weighted scoring/decisions.
+Root namespace `Pondhawk`. A lightweight CQRS mediator, configuration-driven DI modules, pipeline infrastructure, and common exception types.
 
-**Key Types:**
-- `RuleBuilder<TFact>` — Define rules in constructor: `Rule().If(predicate).Then(action)`
-- `ValidationBuilder<TFact>` — Define validations: `Assert<T>(expr).Required().IsEmail()`
-- `RuleSet` (Factory) — Runtime rule creation without static builder classes
-- `RuleSetFactory` — Discovers builders from assemblies, produces `IRuleSet` instances
-- `IRuleSet` — Evaluate facts, validate entities, make weighted decisions
-- `EvaluationContext` — Session state: facts, results, config, lookup tables
-- `EvaluationResults` — Events, scores, violations, timing, fired rules
-
-**Rule Fluent API:**
-```csharp
-Rule<Order>()
-    .If(o => o.Total > 1000)
-    .And(o => o.Status == "Pending")
-    .Then(o => o.RequiresApproval = true);
-```
-
-**Validation Fluent API:**
-```csharp
-Assert<string>(p => p.Name).Required();
-Assert<string>(p => p.Email).Required().IsEmail();
-Assert<int>(p => p.Age).IsGreaterThanOrEqual(0);
-```
-
-**Forward Chaining:** `Modifies(func)` triggers re-evaluation. `Cascade<T>(func)` inserts new facts.
-**Mutex:** `InMutex(name)` — only the first matching rule in a group fires.
-**Fire-once:** `FireOnce()` — rule fires at most once per session.
-**Scoring:** `ThenAffirm(weight)` / `ThenVeto(weight)` accumulate into `Score`. `Decide(threshold)` returns true if Score >= threshold.
-
-### Pondhawk.Rql — Resource Query Language
-
-A standalone filtering DSL with AST, fluent builder, parser, and serialization to LINQ, SQL, and RQL text.
-
-**Key Types:**
-- `RqlFilterBuilder<TTarget>` — Fluent builder: `.Where(expr).Equals(value).And(expr).GreaterThan(value)`
-- `RqlLanguageParser` — Parses RQL text into AST: `ToCriteria("(eq(Name,'John'),gt(Age,30))")`
-- `LambdaSerializerExtensions` — `.ToLambda<T>()` / `.ToExpression<T>()` for LINQ
-- `RqlSerializerExtensions` — `.ToRql()` for RQL text output
-- `SqlSerializerExtensions` — `.ToSqlWhere()` / `.ToSqlQuery()` for parameterized SQL
-
-**Builder → Multiple Targets:**
-```csharp
-var filter = RqlFilterBuilder<Order>
-    .Where(o => o.Status).Equals("Active")
-    .And(o => o.Total).GreaterThan(100m);
-
-Func<Order, bool> predicate = filter.ToLambda();       // In-memory
-Expression<Func<Order, bool>> expr = filter.ToExpression(); // EF Core IQueryable
-string rql = filter.ToRql();                            // (eq(Status,'Active'),gt(Total,#100))
-var (sql, parms) = filter.ToSqlWhere();                 // Status = {0} and Total > {1}
-```
-
-**RQL Operators:** eq, ne, lt, gt, le, ge, sw (starts-with), ew (ends-with), cn (contains), bt (between), in, ni (not-in), nu (is-null), nn (is-not-null).
-**Value Prefixes:** `@` for DateTime, `#` for decimal, `'...'` for strings, bare for int/long/bool.
-
-### Pondhawk.Rules.EFCore — EF Core SaveChanges Validation
-
-Pre-save entity validation interceptor that hooks into EF Core's `SaveChangesInterceptor`.
+**Mediator (`Pondhawk.Mediator`):**
+- `IMediator` / `Mediator` — routes requests through pipeline behaviors to a single handler (cached wrappers, no per-request reflection). `SendAsync` returns a `Response<TResponse>` envelope. Request/response only — no notification/publish channel.
+- `Response<T>` — success/failure envelope: `Ok`, `Value`, `Error`, `IsError`. The mediator maps a thrown `ExternalException` to `Response.Failure` with an `ErrorInfo` (preserving `ErrorKind`); unexpected exceptions → `ErrorKind.System` (logged at Error); `OperationCanceledException` and missing-handler errors still throw. Ergonomic accessors: `AsEntity` (success value), `AsError` (the `ErrorInfo` to propagate — enables cross-type error propagation via `return source.AsError;`), `GetValueOrThrow`, `Match`. It's a value type, so `default(Response<T>)` reads as a coherent `ErrorKind.System` failure. Also implements a non-generic `IResponse` (`Ok` / `ErrorInfo? Error` / `object? Value`) — the type-erased view the ASP.NET layer renders.
+- `Receipt` — payload a mutation returns when it has no entity to hand back (`Response<Receipt>`); carries `Affected`. Factories `Receipt.One`, `Receipt.Of(int)`.
+- `ErrorInfo` (`Pondhawk.Exceptions`) — transport-agnostic error shape. `ErrorKindPolicy.IsTransient(ErrorKind)` is the canonical retry/dead-letter default (System/Remote/Concurrency). `NotFoundException` / `ConflictException` / `NotAuthorizedException` are common `FluentException<T>` subclasses fixing their `Kind`. (The `ErrorKind → HTTP status` mapping lives in Pondhawk.Api, not Core.)
+- `IRequest<TResponse>` (marker) with `ICommand<T>` / `IQuery<T>` aliases; `IRequestHandler<TRequest, TResponse>` with `ICommandHandler` / `IQueryHandler` aliases; `IPipelineBehavior<TRequest, TResponse>` for cross-cutting concerns.
+- `services.AddMediator(assemblies)` — registers mediator + auto-discovers handlers (a `ReflectionTypeLoadException` is salvaged and reported via Warning). `services.AddPipelineBehavior(type)` — registers open-generic behaviors.
+- `BatchExecutionContext` — `AsyncLocal` batch state with nestable `BeginBatch(id)` scope. `BatchCommandResult` — type-erased batch result; failures carry an `ErrorInfo`.
 
 ```csharp
-optionsBuilder.AddRuleValidation(ruleSet);
+services.AddMediator(typeof(MyHandler).Assembly);
+services.AddPipelineBehavior(typeof(LoggingBehavior<,>));
+Response<int> result = await mediator.SendAsync(new CreateOrder { ... });
+if (result.IsError) return result.AsError;   // propagate; else use result.AsEntity
 ```
 
-Validates all `Added` and `Modified` entities through `IRuleSet.Validate()` before reaching the database. Throws `EntityValidationException` with structured violations on failure.
+**Configuration (`Pondhawk.Configuration`):**
+- `IServiceModule` — properties bound from `IConfiguration`, then `Build()` registers services.
+- `services.AddServiceModule<TModule>(configuration)` — bind a module from config and register it. Overload takes an `Action<TModule>` for post-binding overrides.
 
 ### Pondhawk.Hosting — Service Lifecycle Management
 
-Lightweight startup/shutdown management for `Microsoft.Extensions.Hosting`.
+Standalone; only depends on `Microsoft.Extensions.Hosting.Abstractions`.
+- `services.AddSingletonWithStart<TService>(startAction[, stopAction])` — register a singleton and co-locate its start/stop logic (sync, async, or with cancellation).
+- `ServiceStarterHostedService` — one `IHostedService` that calls all start lambdas on startup, stop lambdas in reverse order on shutdown.
+- `AppLifecycleService` — file-based lifecycle signaling (`started.flag` / `stopped.flag`; watches for an external `muststop.flag` to trigger graceful shutdown).
 
 ```csharp
 services.AddSingletonWithStart<RuleSetFactory>(f => f.Start(), f => f.Stop());
 services.AddSingletonWithStart<MyService>((svc, ct) => svc.InitAsync(ct));
 ```
 
-A single `ServiceStarterHostedService` resolves all registered descriptors and calls start lambdas on host startup, stop lambdas in reverse order on shutdown.
+### Pondhawk.Api — ASP.NET Core Web Kit
 
-### Pondhawk.Core — Shared Foundation (Mediator, Configuration, Utilities)
+`net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. References Pondhawk.Core (project) plus the external **Pondhawk.Logging** and **Pondhawk.Rules** NuGet packages. Handlers return `Response<T>` and stay transport-agnostic; the response filter/exception handler are the single seam that maps success/failure to HTTP.
 
-Core utilities, mediator, configuration-driven DI modules, and pipeline infrastructure.
+- **Root:** `services.AddPondhawkApi()` — registers `IHttpContextAccessor` + a scoped `IRequestContext` (`CorrelationId`, `Caller`, `CallerGatewayToken`).
+- **Endpoints:** `IEndpointModule` (`BasePath`, `Configure(RouteGroupBuilder)`, `AddRoutes(IEndpointRouteBuilder)`); `services.AddEndpointModules(assemblies)` + `app.MapEndpointModules(basePath)` (resilient — a throwing module is logged and skipped).
+- **Filters:** `ResponseEndpointFilter` renders `Response<T>` (via `IResponse`) to `Ok`/JSON/stream or a `ProblemDetail` (`application/problem+json`); `ApiKeyEndpointFilter` + `IApiKeyValidator` / `SimpleApiKeyValidator` (constant-time `x-api-key`).
+- **Exceptions:** `ApiExceptionHandler` (`IExceptionHandler`) → `ProblemDetail`.
+- **Json:** `CompactJsonTypeInfoResolver` (omits empty/zero/min-date), `PascalJsonNamingPolicy`, `services.AddPondhawkJson(configure)`.
+- **Behaviors (mediator `IPipelineBehavior`):** `ValidationBehavior<,>` runs Pondhawk.Rules `IRuleSet.TryValidate` → 422; `LoggingBehavior<,>` correlated request logging via Pondhawk.Logging.
+- **Identity (inbound gateway auth — ONE scheme `IdentityConstants.Scheme`, three modes):** `AddGatewayTokenAuthentication(base64Key)` (HS256 JWT in `X-Gateway-Identity-Token`), `AddGatewayHeaderAuthentication()` (unsigned JSON in `X-Gateway-Identity`), `AddGatewayDevelopmentAuthentication(ClaimSet)` (fixed identity — **local dev only**). Minimal `ClaimSet` ↔ `ClaimSetPrincipal`. Inbound only — no outbound token propagation.
+- **Middleware:** `UseDiagnosticsMonitor()` (register EARLY), `UseDiagnosticsEnrichment()` (after auth), `UseRequestLogging()` (register DEEP).
 
-**Mediator (Pondhawk.Mediator namespace):**
-- `IMediator` / `Mediator` — Routes requests through pipeline behaviors to handlers with cached wrappers. `SendAsync` returns a `Response<TResponse>` envelope
-- `Response<T>` — Success/failure envelope (`Ok`, `Value`, `Error`); the mediator converts a thrown `ExternalException` into a `Response.Failure` carrying `ErrorInfo` (preserving `ErrorKind`). Unexpected exceptions → `ErrorKind.System` (logged at Error); cancellation and missing-handler errors still throw
-- `ErrorInfo` — Transport-agnostic error shape shared by exceptions and the envelope. `ErrorKindPolicy.IsTransient(ErrorKind)` — canonical retry/dead-letter default (System/Remote/Concurrency)
-- `NotFoundException` / `ConflictException` / `NotAuthorizedException` — common `FluentException<T>` subclasses fixing their `Kind`
-- `IRequest<TResponse>` — Marker interface. `ICommand<T>` / `IQuery<T>` are semantic aliases
-- `IRequestHandler<TRequest, TResponse>` — Handler interface. `ICommandHandler<T>` / `IQueryHandler<T>` aliases
-- `IPipelineBehavior<TRequest, TResponse>` — Cross-cutting concerns via delegate chain
-- `services.AddMediator(assemblies)` — Registers mediator + auto-discovers handlers
-- `services.AddPipelineBehavior(type)` — Registers open-generic pipeline behavior
-- `BatchExecutionContext` — AsyncLocal batch state tracking with nestable `BeginBatch(id)` scope
-- `BatchCommandResult` — Type-erased result wrapper for batch command responses; failures carry an `ErrorInfo` (with `ErrorKind`), `ErrorMessage` derived from it
-
-**Configuration (Pondhawk.Configuration namespace):**
-- `IServiceModule` — Module interface: properties bound from `IConfiguration`, then `Build()` registers services
-- `services.AddServiceModule<TModule>(configuration)` — Bind module from config and register services
-- `services.AddServiceModule<TModule>(configuration, configure)` — With post-binding overrides
-
-### Pondhawk.Watch — Serilog Sink
-
-A Serilog `ILogEventSink` with Channel-based batching for the Watch structured logging pipeline.
+**ErrorKind → HTTP status:** None→200, NotFound→404, NotImplemented→501, Predicate→422, Conflict→409, Concurrency→410, BadRequest→400, AuthenticationRequired→401, NotAuthorized→403, Remote→502, System/Functional/Unknown→500.
 
 ```csharp
-// Watch Server controls log levels via switches
-Log.Logger = new LoggerConfiguration()
-    .UseWatch("http://localhost:11000", "MyApp")
-    .CreateLogger();
+builder.Services.AddPondhawkApi();
+builder.Services.AddPondhawkJson();
+builder.Services.AddGatewayTokenAuthentication(signingKeyBase64);
+builder.Services.AddMediator(typeof(OrderModule).Assembly);
+builder.Services.AddEndpointModules(typeof(OrderModule).Assembly);
+
+var app = builder.Build();
+app.UseDiagnosticsMonitor();
+app.UseAuthentication();
+app.UseDiagnosticsEnrichment();
+app.UseRequestLogging();
+app.MapEndpointModules("/api");
 ```
 
-## Dependency Graph
+## Related libraries (extracted to their own repos)
+
+These were part of this monorepo and are now separate public repositories, published to NuGet.org. `Pondhawk.Api` consumes `Pondhawk.Logging` and `Pondhawk.Rules` as packages.
+- **pondhawktech/pondhawk-rql** — `Pondhawk.Rql`: Resource Query Language (filtering DSL → LINQ/SQL/RQL/description).
+- **pondhawktech/pondhawk-rules** — `Pondhawk.Rules` + `Pondhawk.Rules.EFCore`: forward-chaining rule engine + EF Core SaveChanges validation.
+- **pondhawktech/pondhawk-logging** — `Pondhawk.Logging` + `Pondhawk.Logging.Watch`: Serilog-based structured logging API + Watch Server provider.
+
+## Dependency graph
 
 ```
-Pondhawk.Core              (foundation — mediator, configuration, pipeline, utilities, exceptions)
-Pondhawk.Watch             (standalone — logging API, Serilog sink)
-Pondhawk.Rules             (standalone)
-Pondhawk.Rules.EFCore ──→  Pondhawk.Rules
-Pondhawk.Rql               (standalone)
-Pondhawk.Hosting           (standalone)
+Pondhawk.Core        (foundation — mediator, configuration, pipeline, utilities, exceptions)
+Pondhawk.Hosting     (standalone)
+Pondhawk.Api ──→ Pondhawk.Core (+ external Pondhawk.Logging & Pondhawk.Rules NuGet packages)
 ```
 
-## Technical Details
+## Technical details
 
-- .NET 10 targeting `net10.0` (Watch.Framework targets `netstandard2.0`)
-- Central package management via `Directory.Packages.props`
-- XML documentation ships in all NuGet packages
-- Each package includes a README.md visible on nuget.org
+- .NET 10 targeting `net10.0`; central package management via `Directory.Packages.props`
+- XML documentation ships in all NuGet packages (100% public-API coverage); each package includes a README.md shown on nuget.org
+- MIT licensed
