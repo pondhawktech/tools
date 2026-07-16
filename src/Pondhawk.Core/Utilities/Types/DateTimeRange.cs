@@ -1,4 +1,7 @@
-﻿namespace Pondhawk.Utilities.Types;
+﻿// Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+namespace Pondhawk.Utilities.Types;
 
 /// <summary>
 /// Enumerates predefined relative date/time range kinds (e.g. Prev1Hour, Today, ThisWeek).

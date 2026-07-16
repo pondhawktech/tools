@@ -1,4 +1,7 @@
-﻿namespace Pondhawk.Utilities.Types;
+﻿// Copyright (c) Pond Hawk Technologies Inc. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+namespace Pondhawk.Utilities.Types;
 
 /// <summary>
 /// Default implementation of <see cref="IDateTimeRange"/> that calculates begin/end from a <see cref="DateTimeRange"/> kind.
