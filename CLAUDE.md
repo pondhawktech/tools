@@ -13,7 +13,6 @@ dotnet build src/Pondhawk.Core/Pondhawk.Core.csproj
 dotnet build src/Pondhawk.Logging/Pondhawk.Logging.csproj
 dotnet build src/Pondhawk.Logging.Watch/Pondhawk.Logging.Watch.csproj
 dotnet build src/Pondhawk.Rules/Pondhawk.Rules.csproj
-dotnet build src/Pondhawk.Rql/Pondhawk.Rql.csproj
 dotnet build src/Pondhawk.Hosting/Pondhawk.Hosting.csproj
 dotnet build src/Pondhawk.Rules.EFCore/Pondhawk.Rules.EFCore.csproj
 dotnet build src/Pondhawk.Api/Pondhawk.Api.csproj
@@ -113,19 +112,6 @@ Pre-save entity validation interceptor that hooks into EF Core's `SaveChangesInt
 - **DbContextOptionsBuilderExtensions**: `AddRuleValidation(IRuleSet)` convenience method.
 - Minimum EF Core version: 5.0.0.
 
-### Pondhawk.Rql — Resource Query Language (standalone, no Core dependency)
-
-A filtering DSL with AST, fluent builder, parser, and multiple serialization targets. Fully standalone — no dependency on Pondhawk.Core.
-
-- **AST**: `RqlTree` (root) contains `Criteria` (list of `IRqlPredicate`). `RqlOperator` enum: Equals, NotEquals, LesserThan, GreaterThan, Between, In, NotIn, StartsWith, Contains, etc.
-- **Builder** (`Pondhawk.Rql.Builder`): `RqlFilterBuilder<TTarget>` provides fluent API: `.Where(expr).Equals(value).And(expr).GreaterThan(value)`. `Introspect()` builds filters from objects decorated with `[CriterionAttribute]`.
-- **Parser** (`Pondhawk.Rql.Parser`): Parses RQL criteria text back into `RqlTree` AST using the **Sprache** parser combinator library. `RqlLanguageParser.ToCriteria(string)` parses criteria. Value type prefixes: `@` for DateTime, `#` for decimal, `'...'` for strings.
-- **Serialization** (`Pondhawk.Rql.Serialization`): Three output formats:
-  - `ToRql()` — RQL text: `(eq(Name,'John'),gt(Age,30))`
-  - `ToLambda<T>()` / `ToExpression<T>()` — compiled LINQ expressions
-  - `ToSqlQuery()` / `ToSqlWhere()` — parameterized SQL
-  - `ToDescription()` — human-readable English: `"Name equals 'John' and Age is greater than 30"`
-
 ### Pondhawk.Hosting — Service Startup Extensions for Generic Host
 
 Lightweight service lifecycle management for `Microsoft.Extensions.Hosting`. Standalone — no dependency on any other Pondhawk project. Only depends on `Microsoft.Extensions.Hosting.Abstractions`.
@@ -148,7 +134,6 @@ Pondhawk.Logging       (standalone — logging API + ILoggerSource, net10.0)
 Pondhawk.Logging.Watch ──→ Pondhawk.Logging   (Watch sink + switching + switch-aware source)
 Pondhawk.Rules    (standalone)
 Pondhawk.Rules.EFCore ──→ Pondhawk.Rules
-Pondhawk.Rql      (standalone)
 Pondhawk.Hosting  (standalone)
 Pondhawk.Api  ──→ Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules  (ASP.NET web kit — endpoint modules, Response<T>→ProblemDetails, gateway identity, diagnostics)
 ```
@@ -157,8 +142,10 @@ Pondhawk.Api  ──→ Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules  (ASP.NE
 
 **[pondhawk/watch-server](https://github.com/pondhawk/watch-server)** (`E:\repository\watch-server`) — The Pondhawk Watch Server, a log event aggregation server with ASP.NET Core Web API, SQLite storage, React UI, and Winston transport for Node.js. Consumes the `Pondhawk.Logging.Watch` NuGet package from this repo as its client-side logging sink.
 
+**[pondhawktech/pondhawk-rql](https://github.com/pondhawktech/pondhawk-rql)** — The Resource Query Language (RQL) implementation, extracted from this repo into its own standalone repository and published to NuGet.org as `Pondhawk.Rql`. It had no internal dependents in this solution.
+
 ## Conventions
 
-- Namespaces match project/folder structure: `Pondhawk.Mediator`, `Pondhawk.Configuration`, `Pondhawk.Rules`, `Pondhawk.Rules.Builder`, `Pondhawk.Rules.Evaluation`, `Pondhawk.Rql`, `Pondhawk.Rql.Builder`, `Pondhawk.Rql.Parser`, `Pondhawk.Rql.Serialization`, `Pondhawk.Hosting`
+- Namespaces match project/folder structure: `Pondhawk.Mediator`, `Pondhawk.Configuration`, `Pondhawk.Rules`, `Pondhawk.Rules.Builder`, `Pondhawk.Rules.Evaluation`, `Pondhawk.Hosting`
 - Exception: `Pondhawk.Core` project uses `RootNamespace=Pondhawk`
-- `LangVersion` varies: `default` in Rules and Hosting, `latestmajor` in Rql, `latest` in Watch
+- `LangVersion` varies: `default` in Rules and Hosting, `latest` in Watch

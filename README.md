@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/pondhawk/tools/actions/workflows/build.yml"><img src="https://github.com/pondhawk/tools/actions/workflows/build.yml/badge.svg" alt="Build" /></a>
+  <a href="https://github.com/pondhawktech/tools/actions/workflows/build.yml"><img src="https://github.com/pondhawktech/tools/actions/workflows/build.yml/badge.svg" alt="Build" /></a>
   <img src="https://img.shields.io/badge/.NET-10.0-512bd4" alt=".NET 10" />
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" />
 </p>
@@ -20,7 +20,6 @@
   <a href="https://www.nuget.org/packages/Pondhawk.Logging.Watch"><img src="https://img.shields.io/nuget/v/Pondhawk.Logging.Watch?label=Logging.Watch" alt="Pondhawk.Logging.Watch" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Rules"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules?label=Rules" alt="Pondhawk.Rules" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Rules.EFCore"><img src="https://img.shields.io/nuget/v/Pondhawk.Rules.EFCore?label=Rules.EFCore" alt="Pondhawk.Rules.EFCore" /></a>
-  <a href="https://www.nuget.org/packages/Pondhawk.Rql"><img src="https://img.shields.io/nuget/v/Pondhawk.Rql?label=Rql" alt="Pondhawk.Rql" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Hosting"><img src="https://img.shields.io/nuget/v/Pondhawk.Hosting?label=Hosting" alt="Pondhawk.Hosting" /></a>
   <a href="https://www.nuget.org/packages/Pondhawk.Api"><img src="https://img.shields.io/nuget/v/Pondhawk.Api?label=Api" alt="Pondhawk.Api" /></a>
 </p>
@@ -35,7 +34,6 @@ Pondhawk Tools is a collection of class libraries built by [Pond Hawk Technologi
 |---------|-------------|
 | [**Pondhawk.Rules**](src/Pondhawk.Rules/README.md) | Forward-chaining rule engine with type-based fact matching, scoring, and validation |
 | [**Pondhawk.Rules.EFCore**](src/Pondhawk.Rules.EFCore/README.md) | EF Core `SaveChangesInterceptor` that validates entities through Rules before save |
-| [**Pondhawk.Rql**](src/Pondhawk.Rql/README.md) | Resource Query Language — filtering DSL with fluent builder, parser, and SQL/LINQ serialization |
 | [**Pondhawk.Core**](src/Pondhawk.Core/README.md) | Shared foundation — mediator, configuration modules, pipeline infrastructure, utilities, exceptions |
 | [**Pondhawk.Logging**](src/Pondhawk.Logging/README.md) | Serilog-based structured logging API (method tracing, object/payload logging, `[Sensitive]` masking) + the `ILoggerSource` acquisition abstraction |
 | [**Pondhawk.Logging.Watch**](src/Pondhawk.Logging.Watch/README.md) | Watch Server provider for Pondhawk.Logging — Serilog sink with Channel-based batching, dynamic switching, and a switch-aware `ILoggerSource` |
@@ -54,7 +52,6 @@ Stable releases are published to [nuget.org](https://www.nuget.org/profiles/pond
 
 ```bash
 dotnet add package Pondhawk.Rules
-dotnet add package Pondhawk.Rql
 dotnet add package Pondhawk.Logging
 dotnet add package Pondhawk.Logging.Watch
 dotnet add package Pondhawk.Api
@@ -260,137 +257,6 @@ catch (EntityValidationException ex)
 
 ---
 
-## Pondhawk.Rql
-
-A Resource Query Language with a fluent builder, text parser, and multiple serialization targets (RQL text, LINQ expressions, parameterized SQL).
-
-### Fluent Builder
-
-Build filters with strongly-typed lambda expressions:
-
-```csharp
-var filter = RqlFilterBuilder<Product>
-    .Where(p => p.Category).Equals("Electronics")
-    .And(p => p.Price).GreaterThan(99)
-    .And(p => p.InStock).Equals(true);
-```
-
-### Supported Operators
-
-| Builder Method | RQL Syntax | SQL Output |
-|----------------|-----------|------------|
-| `.Equals(v)` | `eq(Field,v)` | `Field = @p` |
-| `.NotEquals(v)` | `ne(Field,v)` | `Field <> @p` |
-| `.LesserThan(v)` | `lt(Field,v)` | `Field < @p` |
-| `.GreaterThan(v)` | `gt(Field,v)` | `Field > @p` |
-| `.LesserThanOrEqual(v)` | `le(Field,v)` | `Field <= @p` |
-| `.GreaterThanOrEqual(v)` | `ge(Field,v)` | `Field >= @p` |
-| `.Between(a, b)` | `bt(Field,a,b)` | `Field between @a and @b` |
-| `.In(a, b, c)` | `in(Field,a,b,c)` | `Field in (@a,@b,@c)` |
-| `.NotIn(a, b, c)` | `ni(Field,a,b,c)` | `Field not in (@a,@b,@c)` |
-| `.StartsWith(v)` | `sw(Field,v)` | `Field like 'v%'` |
-| `.Contains(v)` | `cn(Field,v)` | `Field like '%v%'` |
-| `.EndsWith(v)` | `ew(Field,v)` | `Field like '%v'` |
-| `.IsNull()` | `nu(Field)` | `Field is null` |
-| `.IsNotNull()` | `nn(Field)` | `Field is not null` |
-
-Values support `string`, `int`, `long`, `decimal`, `DateTime`, and `bool` types.
-
-### Parsing
-
-Parse RQL text back into a filter AST:
-
-```csharp
-var tree = RqlLanguageParser.ToCriteria("(eq(Name,'John'),gt(Age,30))");
-```
-
-Value prefixes in RQL text:
-- Strings: `'value'` (escape single quotes as `''`)
-- DateTime: `@2025-01-15T00:00:00Z`
-- Decimal: `#99.95`
-- Integers and booleans: bare values (`30`, `true`)
-
-### Serialization
-
-Serialize filters to three different output formats:
-
-```csharp
-var filter = RqlFilterBuilder<Product>
-    .Where(p => p.Category).Equals("Electronics")
-    .And(p => p.Price).GreaterThan(99);
-
-// RQL text
-string rql = filter.ToRql();
-// "(eq(Category,'Electronics'),gt(Price,99))"
-
-// Compiled LINQ predicate
-Func<Product, bool> predicate = filter.ToLambda<Product>();
-var matches = products.Where(predicate);
-
-// Expression tree (for EF Core / IQueryable)
-Expression<Func<Product, bool>> expr = filter.ToExpression<Product>();
-var results = dbContext.Products.Where(expr);
-
-// Parameterized SQL
-var (sql, parameters) = filter.ToSqlQuery<Product>();
-// sql:        "select * from Product where Category = {0} and Price > {1}"
-// parameters: ["Electronics", 99]
-
-// WHERE clause only
-var (where, args) = filter.ToSqlWhere();
-// where: "Category = {0} and Price > {1}"
-
-// Human-readable English description
-string description = filter.ToDescription();
-// "Category equals 'Electronics' and Price is greater than 99"
-```
-
-Case-insensitive string matching is supported via the `insensitive` parameter:
-
-```csharp
-var predicate = filter.ToLambda<Product>(insensitive: true);
-```
-
-### Introspection
-
-Build filters automatically from criteria objects decorated with `[Criterion]`:
-
-```csharp
-public class ProductSearch : BaseCriteria
-{
-    [Criterion(Operation = RqlOperator.Contains)]
-    public string? Name { get; set; }
-
-    [Criterion(Operation = RqlOperator.Equals)]
-    public string? Category { get; set; }
-
-    [Criterion(Name = "Price", Operand = OperandKind.From)]
-    public decimal? MinPrice { get; set; }
-
-    [Criterion(Name = "Price", Operand = OperandKind.To)]
-    public decimal? MaxPrice { get; set; }
-}
-
-// Build filter from populated criteria
-var search = new ProductSearch { Category = "Electronics", MinPrice = 50, MaxPrice = 200 };
-var filter = RqlFilterBuilder<Product>.Create().Introspect(search);
-// Produces: eq(Category,'Electronics'), bt(Price,#50,#200)
-```
-
-### Untyped Builder
-
-For dynamic scenarios where the target type isn't known at compile time:
-
-```csharp
-var filter = RqlFilterBuilder
-    .Where("Status").Equals("Active")
-    .And("CreatedDate").GreaterThan(DateTime.UtcNow.AddDays(-30));
-
-var (sql, args) = filter.ToSqlWhere();
-```
-
----
-
 ## Other Packages
 
 ### Pondhawk.Core
@@ -538,7 +404,6 @@ Pondhawk.Rules             (standalone)
     |
 Pondhawk.Rules.EFCore ──> Pondhawk.Rules
 
-Pondhawk.Rql               (standalone)
 Pondhawk.Hosting           (standalone)
 
 Pondhawk.Api ──> Pondhawk.Core, Pondhawk.Logging, Pondhawk.Rules

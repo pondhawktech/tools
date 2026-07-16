@@ -34,7 +34,6 @@ public class BuildContext : FrostingContext
     [
         "src/Pondhawk.Core/Pondhawk.Core.csproj",
         "src/Pondhawk.Hosting/Pondhawk.Hosting.csproj",
-        "src/Pondhawk.Rql/Pondhawk.Rql.csproj",
         "src/Pondhawk.Rules/Pondhawk.Rules.csproj",
         "src/Pondhawk.Rules.EFCore/Pondhawk.Rules.EFCore.csproj",
         "src/Pondhawk.Logging/Pondhawk.Logging.csproj",
