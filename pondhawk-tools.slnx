@@ -2,7 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/Pondhawk.Core/Pondhawk.Core.csproj" />
     <Project Path="src/Pondhawk.Hosting/Pondhawk.Hosting.csproj" />
-    <Project Path="src/Pondhawk.Rql/Pondhawk.Rql.csproj" />
     <Project Path="src/Pondhawk.Rules/Pondhawk.Rules.csproj" />
     <Project Path="src/Pondhawk.Rules.EFCore/Pondhawk.Rules.EFCore.csproj" />
     <Project Path="src/Pondhawk.Logging/Pondhawk.Logging.csproj" />
@@ -15,7 +14,6 @@
   <Folder Name="/test/">
     <Project Path="test/Pondhawk.Core.Tests/Pondhawk.Core.Tests.csproj" />
     <Project Path="test/Pondhawk.Hosting.Tests/Pondhawk.Hosting.Tests.csproj" />
-    <Project Path="test/Pondhawk.Rql.Tests/Pondhawk.Rql.Tests.csproj" />
     <Project Path="test/Pondhawk.Rules.Tests/Pondhawk.Rules.Tests.csproj" />
     <Project Path="test/Pondhawk.Api.Tests/Pondhawk.Api.Tests.csproj" />
     <Project Path="test/Pondhawk.Logging.Tests/Pondhawk.Logging.Tests.csproj" />
