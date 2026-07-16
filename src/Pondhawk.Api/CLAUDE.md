@@ -9,10 +9,10 @@ transport-agnostic, while the kit renders that envelope to `Ok`/JSON on success 
 diagnostics middleware, an exception handler, and JSON conventions.
 
 Targets `net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. Builds on
-[`Pondhawk.Core`](../Pondhawk.Core/CLAUDE.md) (mediator + `Response<T>` / the non-generic `IResponse`),
-[`Pondhawk.Logging`](../Pondhawk.Logging/CLAUDE.md) (structured logging), and
-the [`Pondhawk.Rules`](https://github.com/pondhawktech/pondhawk-rules) NuGet package (request validation).
-Its third-party PackageReferences are `Microsoft.IdentityModel.JsonWebTokens` and `Pondhawk.Rules`.
+[`Pondhawk.Core`](../Pondhawk.Core/CLAUDE.md) (mediator + `Response<T>` / the non-generic `IResponse`) as a
+project, and the [`Pondhawk.Logging`](https://github.com/pondhawktech/pondhawk-logging) (structured logging)
+and [`Pondhawk.Rules`](https://github.com/pondhawktech/pondhawk-rules) (request validation) NuGet packages.
+Its third-party PackageReferences are `Microsoft.IdentityModel.JsonWebTokens`, `Pondhawk.Logging`, and `Pondhawk.Rules`.
 Namespace root: `Pondhawk.Api`.
 
 The design point: **handlers never touch HTTP.** They return `Response<T>`; the response filter and the

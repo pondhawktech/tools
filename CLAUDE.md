@@ -10,8 +10,6 @@ dotnet build pondhawk-tools.slnx
 
 # Build a specific project
 dotnet build src/Pondhawk.Core/Pondhawk.Core.csproj
-dotnet build src/Pondhawk.Logging/Pondhawk.Logging.csproj
-dotnet build src/Pondhawk.Logging.Watch/Pondhawk.Logging.Watch.csproj
 dotnet build src/Pondhawk.Hosting/Pondhawk.Hosting.csproj
 dotnet build src/Pondhawk.Api/Pondhawk.Api.csproj
 ```
@@ -46,31 +44,9 @@ Core utilities, pipeline infrastructure, mediator, and common exception types. K
 - **Utilities**: Pipeline infrastructure (`IServiceCollection`-based DI registration), type extensions, date/time helpers.
 - **Exceptions**: Common exception types.
 
-### Pondhawk.Logging — Structured Logging API + `ILoggerSource` (standalone)
+### Pondhawk.Api — ASP.NET Core web kit (references Pondhawk.Core + the Pondhawk.Logging & Pondhawk.Rules NuGet packages)
 
-The Serilog-based logging API and the logger-acquisition abstraction. No sink, no transport — provider packages (e.g. Pondhawk.Logging.Watch) build on it. Fully standalone — no dependency on Pondhawk.Core. Targets `net10.0`.
-
-- **Logging API** (`Pondhawk.Logging` namespace): `SerilogExtensions` provides extensions on `Serilog.ILogger`. Obtain a logger via an `ILoggerSource` (below) or the standard Serilog way (`Log.ForContext<T>()`), then call:
-  - **`ILogger.EnterMethod()`** — disposable method tracing scope with automatic entry/exit logging and elapsed time
-  - **`ILogger.Inspect(name, value)`** — logs a name/value pair as `"{Name} = {Value}"` at Debug level
-  - **`ILogger.LogObject(value)`** — serializes an object to a JSON payload
-  - **`ILogger.LogJson/LogSql/LogXml/LogYaml/LogText(title, content)`** — typed payload logging with syntax highlighting hints
-  - Also: `LogPropertyNames` (public, neutralized `Pondhawk.*` property-name contract shared with sinks), serializers (`JsonObjectSerializer`), `PayloadType` enum, `[Sensitive]` attribute, `CorrelationManager`, `TypeExtensions` (concise type names).
-- **`ILoggerSource`**: the single seam an app injects to obtain category-scoped loggers — `CreateLogger<T>()` / `CreateLogger(Type)` / `CreateLogger(string)`, all returning `Serilog.ILogger`. `SerilogLoggerSource` is the canonical-Serilog default (`root.ForContext(SourceContext, category)`). A provider supplies a smarter one; an app can implement its own and drop the Watch package entirely with handlers unchanged. (Named `CreateLogger`, not `For`, to avoid analyzer rule CA1716.)
-
-### Pondhawk.Logging.Watch — Watch Server provider (references Pondhawk.Logging)
-
-A Serilog `ILogEventSink` with Channel-based batching, dynamic switch-based level control, and a switch-aware `ILoggerSource`. Targets `net10.0`.
-
-- **WatchSink**: `ILogEventSink` with unbounded Channel batching. Converts Serilog events to Watch `LogEvent` instances with per-event switch-based filtering (`SwitchSource.Lookup`). Circuit breaker for HTTP resilience.
-- **WatchSinkExtensions**: Serilog config extensions. **`UseWatch(serverUrl, domain)`** is the primary API — sets `MinimumLevel.Verbose()` and adds the sink so the Watch Server controls filtering via switches. `WriteTo.Watch()` is the lower-level alternative. Out-param overloads (`UseWatch(..., out SwitchSource)`, `Watch(..., out SwitchSource)`) expose the switch source so the root can share one instance with a `WatchLoggerSource`.
-- **WatchLogger / WatchLoggerSource**: `WatchLogger` is an internal `ILogger` whose `IsEnabled` consults the live switch table for its category; because the logging API gates on `IsEnabled` (a real, virtually-dispatched interface member), the whole API becomes switch-aware — payloads are not serialized for switch-dropped categories — while callers hold a plain `ILogger`. `WatchLoggerSource` (public `ILoggerSource`) hands these out, sharing one `SwitchSource` with the sink.
-- **Switching**: Dynamic log level control via `SwitchSource`/`SwitchDef` with pattern matching (longest prefix wins). `WatchSwitchSource` polls a Watch Server for switch configuration.
-- **LogEvent/LogEventBatch**: Event model serialized as MemoryPack+Brotli for the wire; System.Text.Json (source-generated via `LogEventBatchContext`) available for debugging/testing.
-
-### Pondhawk.Api — ASP.NET Core web kit (references Pondhawk.Core/Logging + the Pondhawk.Rules NuGet package)
-
-The ASP.NET Core web-app kit for Pondhawk Tools (replaces AppCommon.Api). Targets `net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. References Pondhawk.Core (mediator + `Response<T>`/`IResponse`), Pondhawk.Logging (structured logging), and the **Pondhawk.Rules** NuGet package (validation — now an external dependency from [pondhawktech/pondhawk-rules](https://github.com/pondhawktech/pondhawk-rules)). Organized by concern:
+The ASP.NET Core web-app kit for Pondhawk Tools (replaces AppCommon.Api). Targets `net10.0` with a `FrameworkReference` to `Microsoft.AspNetCore.App`. References Pondhawk.Core (mediator + `Response<T>`/`IResponse`) as a project, and the **Pondhawk.Logging** (structured logging, from [pondhawktech/pondhawk-logging](https://github.com/pondhawktech/pondhawk-logging)) and **Pondhawk.Rules** (validation, from [pondhawktech/pondhawk-rules](https://github.com/pondhawktech/pondhawk-rules)) NuGet packages. Organized by concern:
 
 - **Context**: `IRequestContext` (`CorrelationId`, `Caller` ClaimsPrincipal, `CallerGatewayToken`). The default `RequestContext` owns a stable correlation id (explicit > ambient `CorrelationManager.Current` > generated). Registered by `AddPondhawkApi()` alongside `IHttpContextAccessor`.
 - **Endpoints**: `IEndpointModule` (`BasePath`, `Configure(RouteGroupBuilder)`, `AddRoutes(IEndpointRouteBuilder)`) — self-contained minimal-API route groups. `AddEndpointModules(assemblies)` discovers and DI-registers modules; `MapEndpointModules(basePath)` maps each module's group. Mapping is resilient — a module that throws is logged and skipped so one bad module cannot break startup.
@@ -102,15 +78,15 @@ Lightweight service lifecycle management for `Microsoft.Extensions.Hosting`. Sta
 
 ```
 Pondhawk.Core          (foundation — mediator, pipeline infrastructure, utilities, exceptions)
-Pondhawk.Logging       (standalone — logging API + ILoggerSource, net10.0)
-Pondhawk.Logging.Watch ──→ Pondhawk.Logging   (Watch sink + switching + switch-aware source)
 Pondhawk.Hosting  (standalone)
-Pondhawk.Api  ──→ Pondhawk.Core, Pondhawk.Logging (+ external Pondhawk.Rules NuGet package)  (ASP.NET web kit — endpoint modules, Response<T>→ProblemDetails, gateway identity, diagnostics)
+Pondhawk.Api  ──→ Pondhawk.Core (+ external Pondhawk.Logging & Pondhawk.Rules NuGet packages)  (ASP.NET web kit — endpoint modules, Response<T>→ProblemDetails, gateway identity, diagnostics)
 ```
 
 ## Related Repository
 
-**[pondhawk/watch-server](https://github.com/pondhawk/watch-server)** (`E:\repository\watch-server`) — The Pondhawk Watch Server, a log event aggregation server with ASP.NET Core Web API, SQLite storage, React UI, and Winston transport for Node.js. Consumes the `Pondhawk.Logging.Watch` NuGet package from this repo as its client-side logging sink.
+**[pondhawk/watch-server](https://github.com/pondhawk/watch-server)** (`E:\repository\watch-server`) — The Pondhawk Watch Server, a log event aggregation server with ASP.NET Core Web API, SQLite storage, React UI, and Winston transport for Node.js. Consumes the `Pondhawk.Logging.Watch` NuGet package (now from [pondhawktech/pondhawk-logging](https://github.com/pondhawktech/pondhawk-logging)) as its client-side logging sink.
+
+**[pondhawktech/pondhawk-logging](https://github.com/pondhawktech/pondhawk-logging)** — The structured logging API (`Pondhawk.Logging`) and its Watch Server provider (`Pondhawk.Logging.Watch`), extracted from this repo and published to NuGet.org. `Pondhawk.Api` consumes `Pondhawk.Logging` from this package.
 
 **[pondhawktech/pondhawk-rql](https://github.com/pondhawktech/pondhawk-rql)** — The Resource Query Language (RQL) implementation, extracted from this repo into its own standalone repository and published to NuGet.org as `Pondhawk.Rql`. It had no internal dependents in this solution.
 
